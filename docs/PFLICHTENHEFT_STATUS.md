@@ -19,7 +19,7 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | F-03b | Eingabe-UI | Offen | | | | `src/ui/screens/` | |
 | F-04 | Sammlungen anlegen/benennen/bearbeiten | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/collection-service.ts` | `collection-service.test.ts` |
 | F-05 | Reihenfolge & Mengen persistent | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `adapters/persistence/db.ts` | `collection-service.test.ts`, `persistence.test.ts` |
-| F-06 | Einzelsymbol-Generator (bwip-js SVG) | Offen | | | | `adapters/renderer/barcode-renderer.ts` | |
+| F-06 | Einzelsymbol-Generator (bwip-js SVG) | Umgesetzt | 2026-11-24 | 21:51:17 | #005 `fb59b88` | `adapters/renderer/barcode-renderer.ts` | `barcode-renderer.test.ts` (inkl. Decode-Roundtrip), `barcode-renderer-dom.test.ts` |
 | F-07 | Manueller Player | In Arbeit | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts`, UI | `playback-machine.test.ts` (Domain; UI in M6) |
 | F-08 | Zeitgesteuerter Player (Anzeige-/Leerzeit) | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
 | F-09 | Startverzögerung, Pause, sofortiges Ausblenden | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
@@ -39,7 +39,7 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | S-07 | Sitzungsbericht | Offen | | | | UI | |
 | Q-01 | `AppError`-Hierarchie, Fehlercodes, ErrorLogger | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/errors.ts` | `errors.test.ts` |
 | Q-02 | Globale Fehlerabsicherung (`error`, `unhandledrejection`) → Blank | Offen | | | | `src/app/lifecycle.ts` | |
-| Q-03 | Rendering-Regeln (#000/#FFF, crispEdges, Ruhezonen, ganzzahlig, 90°-Drehung) | Offen | | | | renderer | |
+| Q-03 | Rendering-Regeln (#000/#FFF, crispEdges, Ruhezonen, ganzzahlig, 90°-Drehung) | Umgesetzt | 2026-11-24 | 21:51:17 | #005 `fb59b88` | renderer | `render-layout.test.ts`, `barcode-renderer.test.ts` |
 | Q-04 | `strict`, kein `any`, TSDoc an allen Exporten | Offen | | | | alle | |
 | Q-05 | `navigator.storage.persist()` + Speicheranzeige | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `persistence/db.ts` | `persistence.test.ts` |
 | Q-06 | Update-Policy: kein Reload in aktiver Sitzung | Offen | | | | `src/offline/` | |
@@ -71,3 +71,8 @@ Tests: 172/172 grün (7 Dateien, +74), `npm run build` fehlerfrei.
 `feat(persistence)`: Dexie-Schema v1, Sammlungs-/Session-/Backup-Service, Artikelstamm, JSON-Backup (atomar, vorvalidiert), CSV mit Formelschutz (F-04, F-05, F-13, S-01, S-02, Q-05).
 Dateien: `src/adapters/persistence/db.ts`, `src/application/{collection,backup,session}-service.ts`, `src/domain/{csv,csv-items,backup-schema,profiles}.ts`, `tests/unit/{csv,csv-items,backup-schema}.test.ts`, `tests/integration/*`, `tests/setup.ts`, Doku, `.gitattributes`.
 Tests: 326/326 grün (13 Dateien, +154), `npm run build` fehlerfrei.
+
+### #005 – `fb59b88` – 2026-11-24 21:51:17
+`feat(renderer)`: Barcode-/QR-Renderer mit ganzzahligen Modulen, Ruhezonen, 90°-Drehung und Lookahead-Cache (F-06, Q-03).
+Dateien: `src/domain/render-layout.ts`, `src/adapters/renderer/barcode-renderer.ts`, `src/domain/errors.ts`, `tests/unit/{render-layout,barcode-renderer,barcode-renderer-dom}.test.ts`, `tests/helpers/decode.ts`, Doku.
+Tests: 408/408 grün (16 Dateien, +82), `npm run build` fehlerfrei. Hinweis: zxing meldet UPC-A als `UPCA` mit 13-stelligem Text (für M5 vermerkt).
