@@ -12,10 +12,10 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | M0-03 | Lokales WASM `public/wasm/zxing_reader.wasm` (`npm run copy:wasm`) | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | `public/wasm/zxing_reader.wasm` | Smoke |
 | M0-04 | Vitest-Konfiguration, TS-Typen | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | `vitest.config.ts`, `tsconfig.json`, `src/vite-env.d.ts` | Smoke |
 | M0-05 | Dokumentations-Grundstruktur (4 Säulen) | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | `docs/*.md`, `README.md` | – |
-| F-01a | Format-Typen EAN-13/EAN-8/QR/Code 128/UPC-A als `string` | Offen | | | | `src/domain/types.ts` | |
+| F-01a | Format-Typen EAN-13/EAN-8/QR/Code 128/UPC-A als `string` | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/types.ts` | types (kompiliert) |
 | F-01b | Capture: Kamera-Decode EAN-13/EAN-8/Text-QR | Offen | | | | `adapters/camera`, `adapters/decoder`, `application/capture-service.ts` | |
 | F-02 | Bildimport (File/Blob, Multi-Code) | Offen | | | | `adapters/decoder` | |
-| F-03a | Manuelle Eingabe + Bulk-Parser (zeilenweise Fehler) | Offen | | | | `src/domain/bulk-parser.ts` | |
+| F-03a | Manuelle Eingabe + Bulk-Parser (zeilenweise Fehler) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/bulk-parser.ts` | `bulk-parser.test.ts` (24) |
 | F-03b | Eingabe-UI | Offen | | | | `src/ui/screens/` | |
 | F-04 | Sammlungen anlegen/benennen/bearbeiten | Offen | | | | `application/collection-service.ts` | |
 | F-05 | Reihenfolge & Mengen persistent | Offen | | | | `adapters/persistence/db.ts` | |
@@ -24,9 +24,9 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | F-08 | Zeitgesteuerter Player (Anzeige-/Leerzeit) | Offen | | | | `domain/playback-machine.ts` | |
 | F-09 | Startverzögerung, Pause, sofortiges Ausblenden | Offen | | | | `domain/playback-machine.ts` | |
 | F-10 | Unklarer Übergabebereich dokumentieren | Offen | | | | `domain/playback-machine.ts` | |
-| F-11a | GS1-Modulo-10 (EAN-13/EAN-8/UPC-A) | Offen | | | | `src/domain/checksum.ts` | |
-| F-11b | Prüfziffer bei Generation berechnen | Offen | | | | `src/domain/sequence.ts` | |
-| F-12 | Präfix-/Feldvorlagen (Start, Ende, Schritt, Überlauf-Stopp) | Offen | | | | `src/domain/sequence.ts` | |
+| F-11a | GS1-Modulo-10 (EAN-13/EAN-8/UPC-A) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/checksum.ts` | `checksum.test.ts` |
+| F-11b | Prüfziffer bei Generation berechnen | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/sequence.ts` | `sequence.test.ts` |
+| F-12 | Präfix-/Feldvorlagen (Start, Ende, Schritt, Überlauf-Stopp) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/sequence.ts` | `sequence.test.ts` |
 | F-13 | JSON-Sicherung & geprüftes Restore | Offen | | | | `application/backup-service.ts` | |
 | F-14 | Offline-Start (SW, Precache inkl. WASM) | Offen | | | | `vite.config.ts`, `src/offline/` | |
 | F-15 | Anzeige nie als „gebucht“ ausgeben | Offen | | | | `domain/playback-machine.ts`, UI | |
@@ -37,7 +37,7 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | S-05 | Smart-Interleaver | Offen | | | | `src/domain/interleaver.ts` | |
 | S-06 | Lift-to-Pause-Sensor (nur pausieren) | Offen | | | | `adapters/sensors/lift-detector.ts` | |
 | S-07 | Sitzungsbericht | Offen | | | | UI | |
-| Q-01 | `AppError`-Hierarchie, Fehlercodes, ErrorLogger | Offen | | | | `src/domain/errors.ts` | |
+| Q-01 | `AppError`-Hierarchie, Fehlercodes, ErrorLogger | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/errors.ts` | `errors.test.ts` |
 | Q-02 | Globale Fehlerabsicherung (`error`, `unhandledrejection`) → Blank | Offen | | | | `src/app/lifecycle.ts` | |
 | Q-03 | Rendering-Regeln (#000/#FFF, crispEdges, Ruhezonen, ganzzahlig, 90°-Drehung) | Offen | | | | renderer | |
 | Q-04 | `strict`, kein `any`, TSDoc an allen Exporten | Offen | | | | alle | |
@@ -56,3 +56,8 @@ M0 Setup · M1 Errors/Typen/Checksum/Sequenz/Bulk · M2 Interleaver/Playback-Mac
 Geänderte Dateien: gesamtes Projektgerüst, `package.json`/`package-lock.json`, `vitest.config.ts`, `tsconfig.json`, `src/vite-env.d.ts`, `public/wasm/zxing_reader.wasm`, `tests/unit/smoke.test.ts`, vier Doku-Dateien.
 Tests: 1/1 grün, `npm run build` fehlerfrei (PWA-Precache 7 Einträge inkl. WASM).
 
+
+### #002 – `054851a` – 2026-11-24 21:09:57
+`feat(domain)`: Error-Framework, GS1-Prüfziffern, Sequenz-Engine, Bulk-Parser (F-01a, F-03a, F-11a, F-11b, F-12, Q-01).
+Dateien: `src/domain/{errors,types,checksum,sequence,bulk-parser}.ts`, `tests/unit/{errors,checksum,sequence,bulk-parser}.test.ts`, Doku.
+Tests: 98/98 grün (5 Dateien), `npm run build` fehlerfrei.
