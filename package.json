@@ -1,0 +1,30 @@
+{
+  "name": "barq-player",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "BarQPlayer – Offline-first Android PWA zum Scannen, Erzeugen und zeitgesteuerten Abspielen (Barcode- & QR-Fader) von Lager-Codes.",
+  "scripts": {
+    "dev": "vite --host",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview --host",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "copy:wasm": "node -e \"const fs=require('fs');const path=require('path');const src=path.join('node_modules','zxing-wasm','dist','reader','zxing_reader.wasm');const dst=path.join('public','wasm','zxing_reader.wasm');if(fs.existsSync(src)){fs.copyFileSync(src,dst);console.log('WASM lokal kopiert ->',dst);}else{console.warn('Warnung: zxing_reader.wasm noch nicht gefunden.');}\""
+  },
+  "dependencies": {
+    "barcode-detector": "^3.2.5",
+    "bwip-js": "^4.11.4",
+    "dexie": "^4.4.7",
+    "zxing-wasm": "^3.1.8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.7",
+    "fake-indexeddb": "^6.2.8",
+    "jsdom": "^29.1.1",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.8",
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.1.1"
+  }
+}

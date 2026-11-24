@@ -1,0 +1,30 @@
+:root {
+  color-scheme: light;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: #ffffff;
+  color: #111827;
+}
+
+.container {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+/* Pflichtregel fuer Barcode- & QR-Darstellung: niemals invertieren, scharfe Kanten */
+.barcode-stage {
+  background: #ffffff !important;
+  color: #000000 !important;
+}
+
+.barcode-stage svg {
+  shape-rendering: crispEdges;
+}

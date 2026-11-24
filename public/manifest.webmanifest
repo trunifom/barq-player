@@ -1,0 +1,11 @@
+{
+  "name": "BarQPlayer – Barcode & QR Queue Player",
+  "short_name": "BarQPlayer",
+  "description": "Offline-first Barcode- & QR-Scanner, Generator und Kassen-Fader fuer den Lagerbetrieb.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#111827",
+  "orientation": "any",
+  "icons": []
+}

@@ -1,0 +1,20 @@
+# Dependencies
+node_modules/
+
+# Build & Cache
+dist/
+dev-dist/
+.vite/
+
+# Logs
+*.log
+npm-debug.log*
+
+# Editor & OS
+.DS_Store
+Thumbs.db
+*.local
+
+# Testdaten / lokale Artikelstaemme (Datenschutz)
+*.csv
+!tests/fixtures/*.csv
