@@ -28,22 +28,22 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | F-11b | Prüfziffer bei Generation berechnen | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/sequence.ts` | `sequence.test.ts` |
 | F-12 | Präfix-/Feldvorlagen (Start, Ende, Schritt, Überlauf-Stopp) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/sequence.ts` | `sequence.test.ts` |
 | F-13 | JSON-Sicherung & geprüftes Restore | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/backup-service.ts` | `backup-schema.test.ts`, `backup-service.test.ts` |
-| F-14 | Offline-Start (SW, Precache inkl. WASM) | Offen | | | | `vite.config.ts`, `src/offline/` | |
+| F-14 | Offline-Start (SW, Precache inkl. WASM) | Umgesetzt | 2026-11-24 | 22:54:53 | #008 `51bcd32` | `vite.config.ts`, `src/offline/` | `production-build.test.ts` (Precache inkl. WASM), `offline-update.test.ts` |
 | F-15 | Anzeige nie als „gebucht“ ausgeben | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | `domain/playback-machine.ts`, UI | `playback-machine.test.ts` (Domain; UI in M6); UI: `player.test.ts` |
 | S-01 | CSV-Import/-Export (führende Nullen, Formel-Injection-Schutz) | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/backup-service.ts` | `csv.test.ts`, `csv-items.test.ts`, `backup-service.test.ts` |
 | S-02 | Artikelstamm-Abgleich (`catalogStatus/Source/CheckedAt`) | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/collection-service.ts` | `collection-service.test.ts`, `backup-service.test.ts` |
 | S-03 | Scannerprofile + 20er-Kalibrierung | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | UI Einstellungen | `calibration.test.ts`, `player.test.ts`, `settings.test.ts` |
 | S-04 | Kleinstapel-Modus | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
 | S-05 | Smart-Interleaver | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `src/domain/interleaver.ts` | `interleaver.test.ts` |
-| S-06 | Lift-to-Pause-Sensor (nur pausieren) | Offen | | | | `adapters/sensors/lift-detector.ts` | |
+| S-06 | Lift-to-Pause-Sensor (nur pausieren) | Umgesetzt | 2026-11-24 | 22:54:53 | #008 `51bcd32` | `adapters/sensors/lift-detector.ts` | `lift-detection.test.ts`, `lift-detector.test.ts`, `lift-and-update.test.ts` |
 | S-07 | Sitzungsbericht | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | UI | `player.test.ts` |
 | Q-01 | `AppError`-Hierarchie, Fehlercodes, ErrorLogger | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/errors.ts` | `errors.test.ts` |
 | Q-02 | Globale Fehlerabsicherung (`error`, `unhandledrejection`) → Blank | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | `src/app/lifecycle.ts` | `lifecycle.test.ts`, `bootstrap.test.ts` |
 | Q-03 | Rendering-Regeln (#000/#FFF, crispEdges, Ruhezonen, ganzzahlig, 90°-Drehung) | Umgesetzt | 2026-11-24 | 21:51:17 | #005 `fb59b88` | renderer | `render-layout.test.ts`, `barcode-renderer.test.ts` |
-| Q-04 | `strict`, kein `any`, TSDoc an allen Exporten | Offen | | | | alle | |
+| Q-04 | `strict`, kein `any`, TSDoc an allen Exporten | Umgesetzt | 2026-11-24 | 22:54:53 | #008 `51bcd32` | alle | `quality.test.ts` (TSDoc an allen Exports, kein `any`) |
 | Q-05 | `navigator.storage.persist()` + Speicheranzeige | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `persistence/db.ts` | `persistence.test.ts` |
-| Q-06 | Update-Policy: kein Reload in aktiver Sitzung | Offen | | | | `src/offline/` | |
-| Q-07 | PWA-Icons + Manifest | Offen | | | | `public/icons/` | |
+| Q-06 | Update-Policy: kein Reload in aktiver Sitzung | Umgesetzt | 2026-11-24 | 22:54:53 | #008 `51bcd32` | `src/offline/` | `offline-update.test.ts`, `lift-and-update.test.ts`, `production-build.test.ts` |
+| Q-07 | PWA-Icons + Manifest | Umgesetzt | 2026-11-24 | 22:54:53 | #008 `51bcd32` | `public/icons/` | `production-build.test.ts` (Manifest, Icons) |
 
 ## 2. Meilensteinplan
 
@@ -86,3 +86,14 @@ Tests: 534/534 grün (27 Dateien), `npm run build` fehlerfrei, WASM im Precache.
 `feat(ui)`: Mobile-First-Oberfläche (Scanner, Sammlungen, Generator, Fader, Einstellungen), Router mit Guard, globale Fehler-/Hintergrund-Absicherung, 20er-Kalibrierung, Wiedergabe-Controller (F-01b, F-02, F-03b, F-07, F-15, S-03, S-07, Q-02 umgesetzt).
 Dateien: `src/app/*`, `src/ui/{components,screens,styles}/*`, `src/application/{playback-service,settings-store}.ts`, `src/adapters/wakelock/wake-lock.ts`, `src/domain/{calibration,playback-entries}.ts`, `tests/ui/*`, Doku.
 Tests: 761/761 grün (41 Dateien, +227), `npm run build` ohne Warnungen.
+
+### #008 – `51bcd32` – 2026-11-24 22:54:53
+`feat(offline)`: Offline-Härtung, Update-Policy, PWA-Icons/Manifest, Lift-to-Pause, Endabnahme-Tests (F-14, S-06, Q-04, Q-06, Q-07 umgesetzt).
+Dateien: `src/offline/{update-policy,service-worker}.ts`, `src/ui/components/update-banner.ts`, `src/domain/lift-detection.ts`, `src/adapters/sensors/lift-detector.ts`, `public/icons/*.svg`, `public/manifest.webmanifest`, `index.html`, `src/app/{container,bootstrap}.ts`, `src/ui/screens/{player,settings}.ts`, `tests/{build,ui,unit}/*`, Doku.
+Tests: 849/849 grün (47 Dateien, +88), `npm run build` ohne Warnungen (15 Precache-Einträge inkl. `wasm/zxing_reader.wasm`).
+
+## 4. Endabnahme (Meilenstein 7)
+
+- Alle Muss-Anforderungen F-01 … F-15 sowie S-01 … S-07 und Q-01 … Q-07 sind „Umgesetzt“ (siehe Tabelle).
+- Quality Gate: `npm test` 849/849, `npm run build` 0 Fehler / 0 Warnungen.
+- Offene fachliche Punkte außerhalb der Software (Spezifikation Kap. 2, 25 Phase 0): Scanner-/Kassenmodelle, Stellenbedeutung von `2063701…`, reale Anzeige-/Leerzeiten (20er-Kalibrierung an der Hardware), Hardwaretests von Lift-to-Pause. Rückkanal (Frontkamera/Mikrofon/Kassenschnittstelle) ist laut Spezifikation 9.3 nicht Teil von Version 1.
