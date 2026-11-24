@@ -183,7 +183,7 @@ function encode(request: RenderRequest, normalizedValue: string, barHeight: numb
  */
 export function renderSymbol(request: RenderRequest): RenderedSymbol {
   const { symbology } = request;
-  const check = validateCodeValue(request.value, symbology);
+  const check = validateCodeValue(request.value, symbology, { multiline: true });
   if (!check.ok) throw new AppError(check.code, { details: check.message, userMessage: check.message });
   const value = check.value;
   if (request.eccLevel !== undefined && !['L', 'M', 'Q', 'H'].includes(request.eccLevel)) {

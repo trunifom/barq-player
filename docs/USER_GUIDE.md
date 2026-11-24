@@ -53,4 +53,16 @@ Pro Zeile ein Code. Fehlerhafte Zeilen werden mit Zeilennummer gemeldet (z. B. �
 - **Lange Strichcodes** (z. B. Code 128 mit vielen Zeichen) werden bei Bedarf automatisch **um 90° gedreht**, damit sie größer dargestellt werden können. Halten Sie das Telefon dann entsprechend zum Scanner.
 - QR-Codes enthalten reinen Text. Die App öffnet nie Links und führt nie etwas aus.
 
+## Vorab: Scannen im Lager (Bedienung folgt in Meilenstein 6)
+
+- **Kamera:** Die App nimmt bevorzugt die **Rückkamera**. Beim ersten Start fragt der Browser nach der Kameraberechtigung – bitte erlauben. Die Kamera funktioniert nur über eine sichere Verbindung (HTTPS) bzw. als installierte App. Wird die Berechtigung verweigert oder die Kamera von einer anderen App benutzt, zeigt die App eine verständliche Meldung; **Foto-Import** und **manuelle Eingabe** funktionieren dann trotzdem.
+- **Ein Code, ein Eintrag:** Halten Sie den Code ruhig vor die Kamera. Bleibt er dauerhaft im Bild, wird er **nur einmal** erfasst. Soll derselbe Artikel mehrfach gezählt werden, nehmen Sie den Code kurz aus dem Bild (etwa eine Sekunde) und halten ihn erneut davor – oder ändern Sie die Menge direkt mit **+**/**−**. Im Modus „nur eindeutige Codes“ werden Wiederholungen ignoriert.
+- **Ton und Vibration** bestätigen, dass der Code **tatsächlich gespeichert** wurde. Gab es einen Speicherfehler, hören Sie das tiefe Fehlersignal und der Code wurde **nicht** gespeichert. Ton wird erst nach Ihrem ersten Tippen auf der Seite freigeschaltet (Browser-Vorgabe).
+- **Taschenlampe:** nur verfügbar, wenn Ihr Gerät sie für die Kamera anbietet.
+- **Foto-Import:** Wählen Sie ein oder mehrere Fotos. Finden sich mehrere Codes in einem Bild, wählen Sie aus, welche übernommen werden. Bilder ohne erkennbaren Code oder nicht lesbare Bilder werden als solche gemeldet. Fotos werden nicht gespeichert, nur die ausgewählten Codes (der Dateiname dient als Bezeichnung).
+- **Nur freigegebene Formate** werden übernommen: EAN-13, EAN-8, QR-Code (Text) und Code 128. Erkennungen mit falscher Prüfziffer werden verworfen und nicht korrigiert.
+- **UPC-A:** Ein UPC-A-Strichcode ist technisch ein EAN-13 mit führender 0 und wird deshalb standardmäßig als **EAN-13** (13 Ziffern) gespeichert. UPC-A als eigenes Format kann in den Einstellungen freigegeben werden.
+- **QR-Codes** werden nur als Text gespeichert. Die App **öffnet nie Links** und führt nichts aus; Links, WLAN- und Kontaktdaten werden nur angezeigt, gefährliche Schemata (z. B. `javascript:`) mit Warnung.
+- **Offline:** Die Codeerkennung läuft komplett auf dem Gerät (lokale Datei `wasm/zxing_reader.wasm`); nach der ersten Installation brauchen Sie kein Netz.
+
 **Wichtig vorab:** BarQPlayer zeigt Codes an. „Angezeigt“ bedeutet nie „an der Kasse gebucht“.

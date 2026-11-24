@@ -108,9 +108,11 @@ function parseCode128Line(raw: string): CodeValidation {
   return { ok: true, value, syntax: 'valid', checksum: 'not-applicable' };
 }
 
-function parseQrLine(raw: string): CodeValidation {
+function parseQrLine(raw: string, multiline: boolean): CodeValidation {
+  // Mehrzeilige QR-Texte (z. B. vCard, WLAN) sind nur bei Einzelwerten erlaubt (LF/CR), nie in Bulk-Zeilen.
   // eslint-disable-next-line no-control-regex
-  if (/[\u0000-\u0008\u000a-\u001f\u007f]/.test(raw)) {
+  const forbidden = multiline ? /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/ : /[\u0000-\u0008\u000a-\u001f\u007f]/;
+  if (forbidden.test(raw)) {
     return { ok: false, code: 'ERR_SYNTAX_INVALID', message: 'Der QR-Text enthält Steuerzeichen.' };
   }
   const bytes = utf8Length(raw);
@@ -124,13 +126,14 @@ function parseQrLine(raw: string): CodeValidation {
  * Validiert und normalisiert EINEN Code-Wert nach den Regeln seiner Symbologie (siehe Dateikopf).
  * @param raw - Rohwert (eine Zeile).
  * @param symbology - erwartete Symbologie.
+ * @param options - `multiline: true` erlaubt bei QR Zeilenumbrüche im Text (Einzelwerte, nicht Bulk-Zeilen).
  * @returns normalisierter Wert samt Status oder zeilentauglicher Fehler (nie eine stille Korrektur).
  */
-export function validateCodeValue(raw: string, symbology: Symbology): CodeValidation {
+export function validateCodeValue(raw: string, symbology: Symbology, options: { multiline?: boolean } = {}): CodeValidation {
   if (raw.trim() === '') return { ok: false, code: 'ERR_SYNTAX_INVALID', message: 'Der Wert ist leer.' };
   if (symbology === 'EAN13' || symbology === 'EAN8' || symbology === 'UPCA') return parseGtinLine(raw, symbology);
   if (symbology === 'Code128') return parseCode128Line(raw);
-  return parseQrLine(raw);
+  return parseQrLine(raw, options.multiline === true);
 }
 
 /**

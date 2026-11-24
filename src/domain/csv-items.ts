@@ -143,7 +143,7 @@ export function mapCsvItems(rows: readonly CsvRow[], mapping: CsvMapping, option
       continue;
     }
     const raw = cell(r, mapping.value);
-    const check = validateCodeValue(raw, symbology);
+    const check = validateCodeValue(raw, symbology, { multiline: true });
     if (!check.ok) {
       const hint = check.code === 'ERR_SYNTAX_INVALID' && /^\d+$/.test(raw.trim()) && (symbology === 'EAN13' || symbology === 'EAN8' || symbology === 'UPCA')
         ? ' Hinweis: Tabellenprogramme entfernen führende Nullen; Spalte als Text importieren.'

@@ -101,8 +101,10 @@ Greedy nach größter Restmenge ohne direkten Vorgänger gleicher Identität (`k
 | `ERR_SEQUENCE_OVERFLOW` | Wert passt nicht ins variable Feld | `sequence`, `endFromCount` |
 | `ERR_SEQUENCE_LIMIT_EXCEEDED` | Mehr als `maxItems` Positionen | `sequence` |
 | `ERR_BULK_INPUT_INVALID` | Eingabe kein String / zu viele Zeilen | `bulk-parser` |
-| `ERR_CAMERA_PERMISSION_DENIED`, `ERR_CAMERA_NOT_FOUND`, `ERR_CAMERA_INSECURE_CONTEXT` | Kamera | M5 |
-| `ERR_WASM_LOAD_FAILED`, `ERR_DECODE_FAILED` | Decoder | M5 |
+| `ERR_CAMERA_PERMISSION_DENIED`, `ERR_CAMERA_NOT_FOUND`, `ERR_CAMERA_INSECURE_CONTEXT`, `ERR_CAMERA_UNSUPPORTED` | Kamera (Torch nicht unterstützt) | `camera-adapter` |
+| `ERR_WASM_LOAD_FAILED`, `ERR_DECODE_FAILED` | Decoder (WASM fehlt/passt nicht; Bild unlesbar/zu groß) | `decoder-adapter` |
+| `ERR_RENDER_FAILED` | Darstellung nicht möglich (z. B. QR zu lang für ECC) | `barcode-renderer` |
+| `ERR_NOT_FOUND` | Sammlung/Eintrag existiert nicht (mehr) | Services |
 | `ERR_STORAGE_WRITE_FAILED`, `ERR_STORAGE_QUOTA_EXCEEDED` | Persistenz | M3 |
 | `ERR_IMPORT_SCHEMA_INVALID`, `ERR_IMPORT_CSV_INVALID` | Import | M3 |
 | `ERR_PLAYBACK_FAILED` | Laufzeitfehler im Player (→ Symbol sofort ausblenden) | M2/M6 |
@@ -154,6 +156,29 @@ Balkenhöhe (Module, ohne Klartext): EAN-13/UPC-A 69, EAN-8 65, Code 128 50.
 **Verifikation:** Die Tests vergleichen die Modulzeile mit unabhängigen GS1-Referenz-Encodern (EAN-13/EAN-8/UPC-A), prüfen Start-/Stoppmuster bei Code 128 und rastern jedes Symbol zurück, um es mit `zxing-wasm` (lokales WASM) zu dekodieren (EAN, Code 128, QR in allen ECC-Stufen, Unicode, gedrehter Code 128).
 
 **Hinweise für den Decoder-Adapter (M5):** zxing liefert UPC-A mit Formatnamen `UPCA` und als 13-stelligen Text mit führender `0`; diese Normalisierung muss dort explizit und dokumentiert erfolgen.
+
+## 5a. Erfassung: Kamera, Decoder, Capture (`adapters/camera`, `adapters/decoder`, `adapters/feedback`, `application/capture-service.ts`)
+
+**Kamera (`CameraAdapter`)** – Browser-Schnittstellen sind strukturell typisiert und injizierbar (Tests ohne Kamera).
+- Constraints: `facingMode: { ideal: 'environment' }` (Rückkamera, auf Geräten ohne Rückkamera trotzdem eine Kamera), 1280×720 als Wunsch, kein Audio; eine feste `deviceId` überschreibt die Blickrichtung.
+- Fehlerdiagnose: kein HTTPS/localhost → `ERR_CAMERA_INSECURE_CONTEXT`; `NotAllowedError`/`SecurityError` → `ERR_CAMERA_PERMISSION_DENIED`; `NotFoundError`/`OverconstrainedError` → `ERR_CAMERA_NOT_FOUND`; `NotReadableError`/`AbortError` → `ERR_CAMERA_NOT_FOUND` mit Hinweis auf eine andere App.
+- `stop()` ruft `track.stop()` für ALLE Spuren (auch wenn eine wirft; Fehler wird danach gemeldet). `start()` beendet zuvor eine laufende Sitzung. `switchCamera()`: erst `stop`, dann nächste Kamera (mehrere Geräte: zyklisch; sonst Blickrichtung wechseln); bei Fehler wird die vorherige Kamera wiederhergestellt, der ursprüngliche Fehler gemeldet.
+- Taschenlampe nur bei `capabilities.torch`; sonst `ERR_CAMERA_UNSUPPORTED`.
+
+**Decoder (`HybridDecoder`)** – ein einheitlicher `BarcodeDetector`-Pfad:
+1. Nativer Browser-`BarcodeDetector`, wenn vorhanden UND alle Whitelist-Formate unterstützt werden.
+2. Sonst das `barcode-detector`-ponyfill auf Basis von zxing-wasm. **Offline-Regel:** `prepareZXingModule({ overrides: { locateFile } , fireImmediately: true })` mit `locateZxingFile`, das für `.wasm` immer `./wasm/zxing_reader.wasm` liefert (nie das CDN-Präfix). Ein fehlendes oder nicht passendes WASM führt sofort zu `ERR_WASM_LOAD_FAILED`. Ein Quelltext-Test (`offline-guard`) verbietet CDN-Hosts und absolute URLs in `src/`.
+3. Laufzeit-Fallback: Wirft der native Detektor, wird dasselbe Bild einmal mit WASM wiederholt. Gelingt das, wird dauerhaft auf WASM gewechselt (`fallbackReason` zeigt den Grund); scheitert auch WASM, war das Bild unlesbar und die Engine bleibt unverändert.
+- Whitelist: Standard EAN-13, EAN-8, QR, Code 128; UPC-A optional (`DEFAULT_WHITELIST`). Jede Erkennung läuft durch `interpretDetection`: Format aus dem Decoder, Whitelist, einzige Normalisierung (UPC-A mit 13 Ziffern und führender 0 → 12 Ziffern), Validierung wie beim Speichern. Ungültiges wird als `rejected` (ohne Inhalt) gemeldet, nie gespeichert. Ergebnisse sind oben→unten, links→rechts sortiert.
+- Bildimport: `scanFiles` wertet Dateien nacheinander aus (Speicher schonen), mehrere Codes pro Bild einzeln; Status je Datei `ok` / `no-codes` / `error` (nicht lesbar oder > 25 MB).
+- **UPC-A-Besonderheit:** Ein UPC-A-Strichcode ist zugleich ein gültiger EAN-13 mit führender 0. Mit der Standard-Whitelist (ohne UPC-A) wird er als EAN-13 `0036000291452` erfasst; nur mit reiner UPC-A-Whitelist entsteht UPC-A (`036000291452`). Der Renderer erzeugt für beide dieselben Balken.
+
+**Capture-Service**
+- Technisches Duplikat vs. fachliche Wiederholung (`DuplicateFilter`, monotone Zeit): Ein dauerhaft sichtbarer Code wird nur einmal erfasst; verschwindet er mindestens `absenceMs` (Standard 1200 ms) und erscheint erneut, zählt das als Wiederholung (Menge +1 bzw. im Modus „nur eindeutige Codes“ ignoriert). `minFrames` verlangt aufeinanderfolgende Bilder. Scheitert das Speichern, nimmt `release()` die Akzeptanz zurück (erneuter Versuch im nächsten Bild).
+- Piepton/Vibration (`FeedbackAdapter`) erst NACH erfolgreichem IndexedDB-Write; Audio wird per `unlock()` aus einer Nutzeraktion entsperrt; Fehlersignal ist gedrosselt; Audio-/Vibrationsfehler werden gemeldet, nie verschluckt, und blockieren nie die Erfassung.
+- Überlappende Bilder werden übersprungen (`skipped`), damit sich Auswertungen nicht stauen.
+- QR-Inhalte sind Daten: `classifyQrContent` ordnet nur ein (URL/WLAN/Kontakt/Text, riskante Schemata wie `javascript:` werden gekennzeichnet); nichts wird geöffnet oder ausgeführt. Mehrzeilige QR-Texte (vCard, WLAN) sind als Einzelwerte erlaubt (`validateCodeValue(..., { multiline: true })`), Bulk-Zeilen bleiben einzeilig.
+- Bildimport in zwei Schritten: `scanImages` erkennt (speichert nichts), `saveDetected` speichert die ausgewählten Codes atomar (Quelle `image`, Dateiname als Bezeichnung).
 
 ## 6. Offline-/WASM-Strategie
 - `zxing-wasm` lädt `./wasm/zxing_reader.wasm` über `locateFile`; kein CDN zur Laufzeit.
@@ -224,3 +249,21 @@ Entscheidung: Nur `bwipjs.raw()` nutzen, SVG selbst erzeugen. Grund: Volle Kontr
 
 ### ADR-24: Kein Klartext unter dem Symbol
 Entscheidung: Keine lesbaren Ziffern im Symbolbereich. Grund: Spezifikation 18 („Keine Bedienelemente über dem Symbol“); Scanner brauchen sie nicht, zusätzliche Elemente verkleinern nur die nutzbare Fläche.
+
+### ADR-25: Ein Detektor-Pfad über das barcode-detector-ponyfill
+Entscheidung: Nativ und WASM teilen sich die `BarcodeDetector`-Schnittstelle; WASM kommt über das ponyfill (gleiches zxing-wasm 3.1.8 wie die lokale Datei). Grund: ein Auswertecode für beide Engines; Bibliotheks- und WASM-Version sind per Lockfile gekoppelt (Spezifikation 19.3).
+
+### ADR-26: Rückkamera per `ideal`, nicht `exact`
+Entscheidung: `facingMode: { ideal: 'environment' }`. Grund: `exact` scheitert auf Geräten ohne Rückkamera (Laptops, Tests); `ideal` liefert dort trotzdem ein Bild.
+
+### ADR-27: Fallback erst nach Wiederholung mit WASM
+Entscheidung: Ein Fehler des nativen Detektors führt nicht sofort zum dauerhaften Engine-Wechsel, sondern zu einer Wiederholung mit WASM. Grund: Beschädigte Bilder lassen den nativen Detektor ebenfalls werfen; sie sollen die Engine nicht herabstufen.
+
+### ADR-28: UPC-A als EAN-13 erfassen, solange UPC-A nicht freigegeben ist
+Entscheidung: Keine heimliche Umdeutung. Mit Standard-Whitelist wird ein UPC-A-Strichcode als EAN-13 (13 Ziffern, führende 0) gespeichert, mit reiner UPC-A-Whitelist als UPC-A. Grund: Spezifikation 4.2 („Format aus Decodergebnis übernehmen“); beide Symbole sind bitgleich.
+
+### ADR-29: Mehrzeilige QR-Texte nur als Einzelwerte
+Entscheidung: `validateCodeValue` erlaubt LF/CRLF bei QR nur mit `multiline: true` (Erfassung, Speichern, CSV-Zellen, Rendern); der Bulk-Parser bleibt „eine Zeile = ein Code“. Grund: vCard/WLAN-QR enthalten Zeilenumbrüche; Bulk-Listen können sie nicht abbilden.
+
+### ADR-30: `base: './'` im Build
+Entscheidung: Relative Asset-Pfade. Grund: Betrieb unter Unterpfaden (z. B. GitHub Pages) und lokaler WASM-Pfad `./wasm/zxing_reader.wasm` bleiben gültig.

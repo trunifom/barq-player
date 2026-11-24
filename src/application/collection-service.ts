@@ -164,7 +164,7 @@ export class CollectionService {
   async addItems(collectionId: string, inputs: readonly NewItemInput[], rule: DuplicateRule = 'merge'): Promise<BarcodeItem[]> {
     // 1) Alles vorab prüfen (keine Teilschreibvorgänge)
     const prepared = inputs.map((input, i) => {
-      const check = validateCodeValue(input.value, input.symbology);
+      const check = validateCodeValue(input.value, input.symbology, { multiline: true });
       if (!check.ok) {
         throw new AppError(check.code, { details: `Eintrag ${i + 1}: ${check.message}`, userMessage: `Eintrag ${i + 1}: ${check.message}` });
       }
@@ -220,6 +220,21 @@ export class CollectionService {
         return result.map((r) => touched.get(r.id) ?? r);
       })
     );
+  }
+
+  /**
+   * Sucht einen Eintrag gleicher Symbologie und gleichen Werts in einer Sammlung.
+   * @param collectionId - Sammlung.
+   * @param symbology - Symbologie.
+   * @param value - Wert (exakter Stringvergleich).
+   * @returns Eintrag oder `undefined`.
+   */
+  async findItem(collectionId: string, symbology: Symbology, value: string): Promise<BarcodeItem | undefined> {
+    return this.db.items
+      .where('collectionId')
+      .equals(collectionId)
+      .filter((i) => i.symbology === symbology && i.value === value)
+      .first();
   }
 
   /** @returns Einträge einer Sammlung nach Position sortiert. */

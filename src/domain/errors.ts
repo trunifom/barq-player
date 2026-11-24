@@ -18,6 +18,7 @@ export type ErrorCode =
   | 'ERR_CAMERA_PERMISSION_DENIED'
   | 'ERR_CAMERA_NOT_FOUND'
   | 'ERR_CAMERA_INSECURE_CONTEXT'
+  | 'ERR_CAMERA_UNSUPPORTED'
   | 'ERR_WASM_LOAD_FAILED'
   | 'ERR_DECODE_FAILED'
   | 'ERR_STORAGE_WRITE_FAILED'
@@ -72,6 +73,10 @@ export const ERROR_CATALOG: Readonly<Record<ErrorCode, ErrorCatalogEntry>> = {
   ERR_CAMERA_INSECURE_CONTEXT: {
     userMessage: 'Die Kamera ist nur über HTTPS oder localhost verfügbar.',
     recoveryHint: 'App über eine HTTPS-Adresse öffnen bzw. als PWA installieren.'
+  },
+  ERR_CAMERA_UNSUPPORTED: {
+    userMessage: 'Diese Funktion wird von der Kamera dieses Geräts nicht unterstützt.',
+    recoveryHint: 'Ohne die Funktion weiterarbeiten (z. B. ohne Taschenlampe).'
   },
   ERR_WASM_LOAD_FAILED: {
     userMessage: 'Die lokale Decoder-Datei (WASM) konnte nicht geladen werden.',

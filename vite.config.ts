@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 export default defineConfig({
+  // Relative Pfade: die App läuft auch unter Unterpfaden (z. B. GitHub Pages) und der Decoder findet ./wasm/ lokal.
+  base: './',
   plugins: [
     VitePWA({
       registerType: 'prompt',

@@ -35,3 +35,37 @@ export async function decodeSymbol(symbol: RenderedSymbol, formats: string[], sc
   }
   return readBarcodes({ data, width: w, height: h, colorSpace: 'srgb' } as ImageData, { formats: formats as never, tryHarder: true });
 }
+
+/** Rastergrafik (Graustufen-RGBA) für Erkennungstests. */
+export interface Raster {
+  data: Uint8ClampedArray;
+  width: number;
+  height: number;
+}
+
+/**
+ * Setzt mehrere Symbole nebeneinander auf ein weißes Bild (z. B. „ein Foto mit mehreren Codes“).
+ * @param symbols - gerenderte Symbole.
+ * @param scale - Pixel pro Modul.
+ * @param gapModules - weißer Abstand zwischen den Symbolen in Modulen.
+ */
+export function rasterizeSymbols(symbols: RenderedSymbol[], scale = 4, gapModules = 8): Raster {
+  const width = (symbols.reduce((sum, s) => sum + s.modulesWide, 0) + gapModules * (symbols.length + 1)) * scale;
+  const height = (Math.max(...symbols.map((s) => s.modulesHigh)) + 2 * gapModules) * scale;
+  const data = new Uint8ClampedArray(width * height * 4).fill(255);
+  let offsetX = gapModules * scale;
+  for (const s of symbols) {
+    for (const r of s.rects) {
+      for (let y = r.y * scale; y < (r.y + r.h) * scale; y++) {
+        for (let x = r.x * scale; x < (r.x + r.w) * scale; x++) {
+          const i = ((y + gapModules * scale) * width + (x + offsetX)) * 4;
+          data[i] = 0;
+          data[i + 1] = 0;
+          data[i + 2] = 0;
+        }
+      }
+    }
+    offsetX += (s.modulesWide + gapModules) * scale;
+  }
+  return { data, width, height };
+}
