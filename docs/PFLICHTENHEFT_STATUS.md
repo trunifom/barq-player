@@ -20,21 +20,21 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | F-04 | Sammlungen anlegen/benennen/bearbeiten | Offen | | | | `application/collection-service.ts` | |
 | F-05 | Reihenfolge & Mengen persistent | Offen | | | | `adapters/persistence/db.ts` | |
 | F-06 | Einzelsymbol-Generator (bwip-js SVG) | Offen | | | | `adapters/renderer/barcode-renderer.ts` | |
-| F-07 | Manueller Player | Offen | | | | `domain/playback-machine.ts`, UI | |
-| F-08 | Zeitgesteuerter Player (Anzeige-/Leerzeit) | Offen | | | | `domain/playback-machine.ts` | |
-| F-09 | Startverzögerung, Pause, sofortiges Ausblenden | Offen | | | | `domain/playback-machine.ts` | |
-| F-10 | Unklarer Übergabebereich dokumentieren | Offen | | | | `domain/playback-machine.ts` | |
+| F-07 | Manueller Player | In Arbeit | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts`, UI | `playback-machine.test.ts` (Domain; UI in M6) |
+| F-08 | Zeitgesteuerter Player (Anzeige-/Leerzeit) | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
+| F-09 | Startverzögerung, Pause, sofortiges Ausblenden | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
+| F-10 | Unklarer Übergabebereich dokumentieren | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
 | F-11a | GS1-Modulo-10 (EAN-13/EAN-8/UPC-A) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/checksum.ts` | `checksum.test.ts` |
 | F-11b | Prüfziffer bei Generation berechnen | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/sequence.ts` | `sequence.test.ts` |
 | F-12 | Präfix-/Feldvorlagen (Start, Ende, Schritt, Überlauf-Stopp) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/sequence.ts` | `sequence.test.ts` |
 | F-13 | JSON-Sicherung & geprüftes Restore | Offen | | | | `application/backup-service.ts` | |
 | F-14 | Offline-Start (SW, Precache inkl. WASM) | Offen | | | | `vite.config.ts`, `src/offline/` | |
-| F-15 | Anzeige nie als „gebucht“ ausgeben | Offen | | | | `domain/playback-machine.ts`, UI | |
+| F-15 | Anzeige nie als „gebucht“ ausgeben | In Arbeit | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts`, UI | `playback-machine.test.ts` (Domain; UI in M6) |
 | S-01 | CSV-Import/-Export (führende Nullen, Formel-Injection-Schutz) | Offen | | | | `application/backup-service.ts` | |
 | S-02 | Artikelstamm-Abgleich (`catalogStatus/Source/CheckedAt`) | Offen | | | | `application/collection-service.ts` | |
 | S-03 | Scannerprofile + 20er-Kalibrierung | Offen | | | | UI Einstellungen | |
-| S-04 | Kleinstapel-Modus | Offen | | | | `domain/playback-machine.ts` | |
-| S-05 | Smart-Interleaver | Offen | | | | `src/domain/interleaver.ts` | |
+| S-04 | Kleinstapel-Modus | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
+| S-05 | Smart-Interleaver | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `src/domain/interleaver.ts` | `interleaver.test.ts` |
 | S-06 | Lift-to-Pause-Sensor (nur pausieren) | Offen | | | | `adapters/sensors/lift-detector.ts` | |
 | S-07 | Sitzungsbericht | Offen | | | | UI | |
 | Q-01 | `AppError`-Hierarchie, Fehlercodes, ErrorLogger | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/errors.ts` | `errors.test.ts` |
@@ -61,3 +61,8 @@ Tests: 1/1 grün, `npm run build` fehlerfrei (PWA-Precache 7 Einträge inkl. WAS
 `feat(domain)`: Error-Framework, GS1-Prüfziffern, Sequenz-Engine, Bulk-Parser (F-01a, F-03a, F-11a, F-11b, F-12, Q-01).
 Dateien: `src/domain/{errors,types,checksum,sequence,bulk-parser}.ts`, `tests/unit/{errors,checksum,sequence,bulk-parser}.test.ts`, Doku.
 Tests: 98/98 grün (5 Dateien), `npm run build` fehlerfrei.
+
+### #003 – `ed64ae2` – 2026-11-24 21:18:03
+`feat(domain)`: Smart-Interleaver und Fader-Zustandsmaschine (F-08, F-09, F-10, S-04, S-05 umgesetzt; F-07 und F-15 Domain-Teil, UI folgt in M6).
+Dateien: `src/domain/{interleaver,playback-machine}.ts`, `tests/unit/{interleaver,playback-machine}.test.ts`, Doku.
+Tests: 172/172 grün (7 Dateien, +74), `npm run build` fehlerfrei.
