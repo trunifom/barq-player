@@ -27,8 +27,41 @@ Siehe Spezifikation Kap. 16. Barcodes immer als `string`. Das Dexie-Schema (Meil
 ## 3. Zustandsautomat
 Wird in Meilenstein 2 dokumentiert (Diagramm, Übergangsregeln).
 
-## 4. Error-Code-Katalog
-Wird in Meilenstein 1 dokumentiert (`ERR_CHECKSUM_INVALID`, `ERR_SEQUENCE_OVERFLOW`, `ERR_CAMERA_PERMISSION_DENIED`, `ERR_WASM_LOAD_FAILED`, `ERR_STORAGE_WRITE_FAILED`, `ERR_IMPORT_SCHEMA_INVALID`, …).
+## 4. Fehlerkonzept und Error-Code-Katalog (`src/domain/errors.ts`)
+
+`AppError` trägt `code`, `details` (technisch), `cause`, `userMessage` (deutsch, UI) und `recoveryHint` (Handlungsempfehlung). `toAppError(unknown)` normalisiert jeden gefangenen Wert; `isAppError` ist der Type Guard. Der `ErrorLogger` ist ein Ringpuffer (Standard 200 Einträge) mit Listenern für UI-Banner. Er protokolliert nur Code, Standardmeldung und bereinigten Kontext – **nie** `details` oder Barcode-Werte (Kontextschlüssel `value`, `raw`, `content`, `text`, `payload`, `token`, … werden zu `[redacted]`).
+
+| Code | Bedeutung | Ausgelöst durch |
+|---|---|---|
+| `ERR_SYNTAX_INVALID` | Länge/Zeichen ungültig | `checksum`, `bulk-parser` |
+| `ERR_CHECKSUM_INVALID` | GS1-Prüfziffer falsch | `validateGtin`, `bulk-parser` |
+| `ERR_SEQUENCE_CONFIG_INVALID` | Vorlage/Definition ungültig | `sequence` |
+| `ERR_SEQUENCE_OVERFLOW` | Wert passt nicht ins variable Feld | `sequence`, `endFromCount` |
+| `ERR_SEQUENCE_LIMIT_EXCEEDED` | Mehr als `maxItems` Positionen | `sequence` |
+| `ERR_BULK_INPUT_INVALID` | Eingabe kein String / zu viele Zeilen | `bulk-parser` |
+| `ERR_CAMERA_PERMISSION_DENIED`, `ERR_CAMERA_NOT_FOUND`, `ERR_CAMERA_INSECURE_CONTEXT` | Kamera | M5 |
+| `ERR_WASM_LOAD_FAILED`, `ERR_DECODE_FAILED` | Decoder | M5 |
+| `ERR_STORAGE_WRITE_FAILED`, `ERR_STORAGE_QUOTA_EXCEEDED` | Persistenz | M3 |
+| `ERR_IMPORT_SCHEMA_INVALID`, `ERR_IMPORT_CSV_INVALID` | Import | M3 |
+| `ERR_PLAYBACK_FAILED` | Laufzeitfehler im Player (→ Symbol sofort ausblenden) | M2/M6 |
+| `ERR_UNKNOWN` | Fallback | überall |
+
+Regeln: Jeder `catch` behandelt den Fehler typisiert (`unknown` → `toAppError`), protokolliert über den Logger und macht ihn in der UI sichtbar. Kein stilles Verschlucken.
+
+## 4a. Prüfziffern (`src/domain/checksum.ts`)
+GS1 Modulo-10: Gewichte 3,1,3,1,… von **rechts** über den Nummernkörper (letzte Nutzdatenstelle = 3); Prüfziffer = `(10 − S mod 10) mod 10`. Gilt unverändert für EAN-13 (12+1), EAN-8 (7+1) und UPC-A (11+1). `validateGtin` trennt `syntax` und `checksum`, nennt bei falscher Prüfziffer die erwartete Ziffer und **korrigiert nie**. Die Symbologie wird immer vorgegeben, nie aus der Länge geraten.
+
+## 4b. Sequenz-Engine (`src/domain/sequence.ts`)
+Wert = `prefix + pad(feld, variableWidth) + suffixBeforeCheckDigit` (+ GS1-Prüfziffer bei EAN). Start/Ende/Schritt sind dezimale Strings (JSON-sicher), gerechnet wird mit `BigInt`.
+
+- Beispiel `2 063701 028{XX}{C}`, Schritt `+12`: Präfix `2063701028`, Feldbreite 2 → Werte `00, 12, … 96` (9 Codes); Endwert 100 ⇒ `ERR_SEQUENCE_OVERFLOW`, nichts wird erzeugt.
+- EAN-13 verlangt `|prefix| + width + |suffix| = 12`, EAN-8 = 7; EAN braucht `gs1-mod10`, QR/Code 128 brauchen `none`.
+- `validateSequenceDefinition` sammelt **alle** feldgenauen Fehler/Warnungen; `generateSequence` wirft sofort (nicht erst beim ersten `next()`), liefert lazy und verwendet nie mehr als `maxItems` (Standard 10 000, hart 100 000).
+- `endFromCount` rechnet „Anzahl“ in ein Ende um und meldet Überlauf.
+- `parseSequenceTemplate('2 063701 028{XX}{C}', 'EAN13')` zerlegt die Schreibweise; Leerzeichen in festen Teilen werden nur bei EAN entfernt.
+
+## 4c. Bulk-Parser (`src/domain/bulk-parser.ts`)
+Eine Zeile = ein Code, explizite Symbologie, zeilengenaue deutsche Fehler (`Zeile 7: …`), ungültige Zeilen erscheinen nie in den Ergebnissen. Normalisierung: BOM weg; EAN/UPC: Leerzeichen/Tabs entfernen; Code 128: Zeilenränder trimmen, ASCII 0x20–0x7E, ≤ 80 Zeichen; QR: Text unverändert, keine Steuerzeichen (außer Tab), ≤ 2000 UTF-8-Bytes. Grenze 10 000 Zeilen (`ERR_BULK_INPUT_INVALID`). Duplikate: `keep` (Standard) oder `merge` (zu Menge).
 
 ## 5. Rendering-Mathematik
 Wird in Meilenstein 4 dokumentiert (Ruhezonen EAN-13 11X/7X, EAN-8 7X/7X, Code 128 10X/10X, QR 4X; ganzzahlige Pixel pro Modul).
@@ -48,6 +81,18 @@ Spezifikations-ADRs 01–05 gelten unverändert (Kap. 26). Ergänzungen:
 
 ### ADR-06: Eigene `vitest.config.ts`
 Entscheidung: Test-Konfiguration getrennt von `vite.config.ts`. Grund: Das PWA-Plugin wird im Testlauf nicht gebraucht; saubere Trennung.
+
+### ADR-08: Sequenzende außerhalb des Schrittrasters
+Entscheidung: Liegt `end` nicht auf dem Raster, endet die Reihe beim letzten Rasterwert ≤ `end` und die Vorschau zeigt eine **Warnung** (kein Fehler). Grund: Spezifikation 21 („Ende wird nur erreicht, wenn es auf dem Schrittraster liegt“); sichtbar statt still.
+
+### ADR-09: Überlauf = Fehler, nicht Warnung
+Entscheidung: `start` oder `end` größer als das Feldmaximum ⇒ `ERR_SEQUENCE_OVERFLOW`; keine Ausgabe. „Anzahl“-Eingaben laufen über `endFromCount`. Ein Schritt größer als der Bereich liefert legal genau einen Wert (Warnung). Grund: Spezifikation 6.3 und AGENTS.md Regel 4.
+
+### ADR-10: Sequenzen für EAN verlangen volle Körperlänge
+Entscheidung: Die Summe aus Präfix, Feld und festem Teil muss exakt 12 (EAN-13) bzw. 7 (EAN-8) betragen; es wird weder aufgefüllt noch gekürzt. Grund: Spezifikation 6.2 (Beispiel `20637010289XY` kann nicht zwei freie Endstellen haben).
+
+### ADR-11: Leerraum-Regeln im Bulk-Parser
+Entscheidung: Nur bei EAN/UPC werden Leerzeichen/Tabs innerhalb der Zeile entfernt; QR bleibt unverändert, Code 128 wird nur an den Rändern getrimmt. Grund: Spezifikation 6.5 (QR nicht mit EAN-Regeln behandeln).
 
 ### ADR-07: Toolchain-Versionen
 Entscheidung: Aktuelle Releases (TypeScript 7, Vite 8, Vitest 5) wie von `npm install` aufgelöst; Versionen sind durch `package-lock.json` fixiert. `@types/node` nur für Tests (`types: ["node"]`); `src/domain/` bleibt frei von Node-/Browser-APIs.

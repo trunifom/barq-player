@@ -3,7 +3,11 @@
 Offline-first Android-PWA zum Scannen, Erzeugen (EAN-13, EAN-8, QR-Code, Code 128) und zeitgesteuerten Abspielen von Lager-Codes an Kassensystemen. Eine Anzeige gilt nie als bestätigte Kassenbuchung.
 
 ## Feature-Status
-Meilenstein 0 (Setup) – noch keine Fachfunktionen. Aktueller Stand: [`docs/PFLICHTENHEFT_STATUS.md`](docs/PFLICHTENHEFT_STATUS.md).
+- ✅ M0 Setup (lokales WASM, Doku-Grundstruktur)
+- ✅ M1 Fachkern 1: Fehler-Framework, Domain-Typen, GS1-Prüfziffern, Sequenz-Engine (`2 063701 028{XX}{C}`, Schritt `+12`), Bulk-Parser
+- ⏳ M2–M7: Interleaver/Player-Zustandsmaschine, Persistenz, Renderer, Kamera/Decoder, UI, Offline-Härtung
+
+Detailstand: [`docs/PFLICHTENHEFT_STATUS.md`](docs/PFLICHTENHEFT_STATUS.md).
 
 ## Tech-Stack
 TypeScript (strict), Vite, vite-plugin-pwa, Dexie (IndexedDB), bwip-js, zxing-wasm (lokales WASM), barcode-detector, Vitest.
