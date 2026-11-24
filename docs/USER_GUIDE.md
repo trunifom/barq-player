@@ -4,8 +4,6 @@ BarQPlayer erfasst Barcodes und QR-Codes im Lager, erzeugt Codes und Zahlenreihe
 
 > **Das Wichtigste vorab:** BarQPlayer **zeigt Codes nur an**. „Angezeigt“ oder „bestätigt“ bedeutet **nie**, dass die Kasse einen Artikel gebucht hat. „Bestätigt“ heißt: *Sie* haben an der Kasse nachgesehen. Prüfen Sie die Kasse bei Unsicherheit immer selbst.
 
-> Stand: Meilenstein 6. Kapitel 1 und 2 (Installation, Offline-Betrieb) beschreiben das Zielverhalten; die Offline-Härtung (Service Worker, Update-Verhalten) wird in Meilenstein 7 abgeschlossen.
-
 ## Inhalt
 1. PWA auf Android installieren
 2. Offline-Vorbereitung
@@ -32,6 +30,10 @@ Die Codeerkennung und alle Funktionen laufen **auf dem Gerät**; es werden keine
 1. Öffnen Sie die App **einmal mit Internetverbindung** und warten Sie, bis sie vollständig geladen ist.
 2. Prüfen Sie die Offline-Bereitschaft: Flugmodus einschalten, App schließen und neu öffnen, Kamera und Foto-Import testen.
 3. Erstellen Sie **vor wichtigen Einsätzen ein Backup** (Kapitel 9).
+
+Sobald alle Dateien im Gerätespeicher liegen, zeigt die App „**Die App ist jetzt offline nutzbar**“. Erscheint stattdessen „Der Offline-Betrieb konnte nicht eingerichtet werden“, öffnen Sie die App über HTTPS und mit Internetverbindung erneut.
+
+**Updates:** Eine neue Version wird **nie von selbst und nie mitten in einer Fader-Sitzung** aktiviert. Wenn eine neue Version bereitsteht, erscheint oben der Hinweis „Eine neue Version von BarQPlayer ist verfügbar“ mit der Schaltfläche **Jetzt aktualisieren**. Läuft oder pausiert gerade eine Sitzung, ist die Schaltfläche gesperrt und der Hinweis erklärt warum; sie wird frei, sobald die Sitzung beendet ist. Aktualisieren lädt die App neu – erstellen Sie vorher bei Bedarf ein Backup. Den Zustand sehen Sie auch unter *Einstellungen → Diagnose*.
 
 ## 3. Scannen im Lager (Bereich **Erfassen**)
 **Sammlung wählen:** Wählen Sie oben die Zielsammlung oder tippen Sie auf **Neu**.
@@ -88,6 +90,7 @@ Die Codeerkennung und alle Funktionen laufen **auf dem Gerät**; es werden keine
 - Die **Bedienleiste** liegt **unter** der Anzeigefläche, nie über dem Code. **STOPP / Pause** ist die große rote Schaltfläche. Mit einem Bluetooth-Taster/Tastatur: **Leertaste oder Escape = Pause**, **Enter = Bestätigen**.
 - **Pause, Fehler und App-Wechsel blenden den Code sofort aus** – damit die Kasse ihn nicht doppelt liest. Das gilt auch, wenn Sie den Tab wechseln, den Bildschirm sperren oder die App in den Hintergrund schicken.
 - Der Bildschirm bleibt während der Sitzung an (sofern Ihr Gerät das erlaubt).
+- **Lift-to-Pause (optional, experimentell, standardmäßig aus):** Unter *Einstellungen → Lift-to-Pause* können Sie zuschalten, dass der Fader sofort pausiert, wenn das Telefon angehoben, gekippt oder bewegt wird – oder wenn der Bewegungssensor keine Daten mehr liefert. Die Funktion wird erst scharf, wenn der erste Code angezeigt wird (nicht im Countdown). Sie kann **nur pausieren**; sie setzt nie fort und bestätigt nie etwas – danach gilt Kapitel 7. Testen Sie sie an Ihrem Gerät, bevor Sie sich darauf verlassen.
 - Die Navigation ist während einer Sitzung gesperrt; beenden oder brechen Sie die Sitzung zuerst ab.
 
 **Zusammenfassung:** Am Ende sehen Sie, wie viele Positionen **angezeigt** und wie viele von Ihnen **bestätigt** wurden – ohne Aussage über Kassenbuchungen.
@@ -149,6 +152,9 @@ Die Werte sind **Teststartpunkte, keine Garantie**. Wiederholen Sie wichtige Ein
 | Fader startet nicht („Position n …“) | Der genannte Code ist nicht darstellbar (z. B. zu langer Text) oder passt nicht auf den Bildschirm; entfernen/kürzen. |
 | Scanner liest identische Codes nicht | **Smart-Interleaving** einschalten oder das Profil „Identische Codes“ bzw. eine längere Leerzeit für identische Codes verwenden (Kalibrierung). |
 | Sitzung zeigt „Fehler“ | Der Code wurde sofort ausgeblendet. Kasse prüfen, dann wie in Kapitel 7 fortfahren. Details unter *Einstellungen → Diagnose* (ohne Barcode-Inhalte). |
+| „Der Offline-Betrieb konnte nicht eingerichtet werden“ | App über HTTPS und mit Internet öffnen und neu laden; danach Flugmodus-Test (Kapitel 2). |
+| Hinweis „neue Version“ lässt sich nicht anklicken | Es läuft oder pausiert eine Fader-Sitzung. Sitzung beenden oder abbrechen, dann aktualisieren. |
+| Fader pausiert von selbst („Sensor“) | Lift-to-Pause hat ein Anheben/Bewegen oder fehlende Sensordaten erkannt. Kapitel 7 anwenden; bei Fehlalarmen die Funktion in den Einstellungen ausschalten. |
 | Daten verschwunden | Browserdaten gelöscht? Letztes **Backup wiederherstellen** (Kapitel 9). |
 
 **Diagnose:** *Einstellungen → Diagnose* zeigt Decoder-Engine, App-Version und das Fehlerprotokoll. Es enthält Fehlercodes, aber keine Barcode-Inhalte.

@@ -29,9 +29,10 @@ export interface AppSettings {
   liftToPause: boolean;
 }
 
-/** Standardwerte. */
+/** Alle wählbaren Formate in fester Reihenfolge. */
 const ALL_FORMATS: readonly Symbology[] = ['EAN13', 'EAN8', 'QRCode', 'Code128', 'UPCA'];
 
+/** Standardwerte. */
 export const DEFAULT_SETTINGS: Readonly<AppSettings> = Object.freeze({
   collectionId: null,
   profileId: null,

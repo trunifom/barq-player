@@ -211,6 +211,46 @@ export function mountSettings(root: HTMLElement, ctx: AppContext, _route: Route)
   soundBox.addEventListener('change', applyFeedback);
   vibrationBox.addEventListener('change', applyFeedback);
 
+  // ------------------------------------------------------------------ Lift-to-Pause
+  const liftBox = h('input', { type: 'checkbox', id: 'st-lift', checked: s0.liftToPause && ctx.lift.supported, disabled: !ctx.lift.supported });
+  const liftInfo = h('p', { class: 'hint', id: 'st-lift-info' }, ctx.lift.supported ? 'Pausiert den Fader sofort, wenn das Telefon angehoben, gekippt oder bewegt wird oder der Sensor keine Daten mehr liefert. Der Sensor kann nur pausieren, nie fortsetzen oder bestätigen. Experimentell – an Ihrer Hardware testen.' : 'Dieses Gerät bzw. dieser Browser bietet keine Bewegungssensoren an.');
+  liftBox.addEventListener('change', () => {
+    void (async () => {
+      if (liftBox.checked) {
+        const ok = await ctx.lift.enable();
+        if (!ok) {
+          liftBox.checked = false;
+          ctx.settings.update({ liftToPause: false });
+          ctx.notify.info('Die Bewegungssensoren sind nicht verfügbar oder wurden nicht erlaubt.');
+          return;
+        }
+        ctx.settings.update({ liftToPause: true });
+      } else {
+        ctx.lift.disable();
+        ctx.settings.update({ liftToPause: false });
+      }
+    })();
+  });
+
+  // ------------------------------------------------------------------ Update-Status
+  const updateInfo = h('p', { class: 'hint', id: 'st-update' });
+  const renderUpdate = (): void => {
+    const u = ctx.updates.state;
+    updateInfo.textContent =
+      u.phase === 'offline-ready'
+        ? 'Offline bereit: alle Dateien sind im Cache.'
+        : u.phase === 'update-available'
+          ? 'Neue Version verfügbar. Sie wird nie mitten in einer Fader-Sitzung aktiviert (Hinweis oben auf der Seite).'
+          : u.phase === 'applying'
+            ? 'Neue Version wird aktiviert.'
+            : u.phase === 'error'
+              ? `Offline-/Update-Problem: ${u.error?.userMessage ?? 'unbekannt'}`
+              : 'Keine Update-Informationen (im installierten Produktionsbuild erscheinen sie hier).';
+  };
+  const unsubUpdates = ctx.updates.subscribe(() => {
+    if (alive) renderUpdate();
+  });
+
   // ------------------------------------------------------------------ Diagnose
   const logBox = h('div', { id: 'st-log' });
   const decoderInfo = h('p', { class: 'hint', id: 'st-decoder' });
@@ -241,14 +281,17 @@ export function mountSettings(root: HTMLElement, ctx: AppContext, _route: Route)
       h('section', { class: 'card', 'aria-labelledby': 'st-store-title' }, h('h2', { id: 'st-store-title' }, 'Speicher'), h('button', { type: 'button', class: 'btn', id: 'st-storage-btn', onclick: checkStorage }, 'Persistenten Speicher anfragen / Status'), storageOut),
       h('section', { class: 'card', 'aria-labelledby': 'st-bak-title' }, h('h2', { id: 'st-bak-title' }, 'Backup'), h('button', { type: 'button', class: 'btn btn--primary', id: 'st-backup', onclick: () => void ctx.backup.exportJson().then((json) => downloadText(`barqplayer-backup-${ctx.nowIso().slice(0, 10)}.json`, json, 'application/json')).catch(fail('settings-backup')) }, 'Backup herunterladen (JSON)'), h('p', { class: 'hint' }, 'Wiederherstellen ersetzt alle Daten. Die Datei wird vollständig vorab geprüft.'), h('label', { for: 'st-restore-file', class: 'sr-only' }, 'Backup-Datei wählen'), restoreFile, restoreOut),
       h('section', { class: 'card', 'aria-labelledby': 'st-fb-title' }, h('h2', { id: 'st-fb-title' }, 'Rückmeldung beim Scannen'), h('label', { class: 'check', for: 'st-sound' }, soundBox, 'Piepton nach erfolgreichem Speichern'), h('label', { class: 'check', for: 'st-vibration' }, vibrationBox, 'Vibration nach erfolgreichem Speichern')),
-      h('section', { class: 'card', 'aria-labelledby': 'st-diag-title' }, h('h2', { id: 'st-diag-title' }, 'Diagnose'), h('p', { class: 'hint' }, `App-Version ${ctx.appVersion}. Das Protokoll enthält keine Barcode-Inhalte.`), decoderInfo, logBox, h('button', { type: 'button', class: 'btn', id: 'st-log-clear', onclick: () => { ctx.logger.clear(); renderLog(); } }, 'Protokoll leeren'))
+      h('section', { class: 'card', 'aria-labelledby': 'st-lift-title' }, h('h2', { id: 'st-lift-title' }, 'Lift-to-Pause (experimentell)'), h('label', { class: 'check', for: 'st-lift' }, liftBox, 'Beim Anheben des Telefons pausieren'), liftInfo),
+      h('section', { class: 'card', 'aria-labelledby': 'st-diag-title' }, h('h2', { id: 'st-diag-title' }, 'Diagnose'), h('p', { class: 'hint' }, `App-Version ${ctx.appVersion}. Das Protokoll enthält keine Barcode-Inhalte.`), decoderInfo, updateInfo, logBox, h('button', { type: 'button', class: 'btn', id: 'st-log-clear', onclick: () => { ctx.logger.clear(); renderLog(); } }, 'Protokoll leeren'))
     )
   );
   void loadProfiles();
   void refreshCatalogInfo();
   renderLog();
+  renderUpdate();
   return () => {
     alive = false;
     unsub();
+    unsubUpdates();
   };
 }

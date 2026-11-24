@@ -332,7 +332,17 @@ function mountSession(root: HTMLElement, ctx: AppContext, machine: PlaybackMachi
     renderBar(snap);
   };
 
-  const unsubscribe = machine.subscribe(render);
+  // Optional: Lift-to-Pause (nur PAUSIEREN). Scharf geschaltet wird erst, wenn das Telefon bereit liegt (nicht im Countdown).
+  const useLift = ctx.settings.get().liftToPause && ctx.lift.supported;
+  const syncLift = (state: PlaybackSnapshot['state']): void => {
+    if (!useLift) return;
+    if (state === 'SHOWING' || state === 'BLANKING' || state === 'WAITING_CONFIRMATION') ctx.lift.arm();
+    else ctx.lift.disarm();
+  };
+  const unsubscribe = machine.subscribe((snap) => {
+    render(snap);
+    syncLift(snap.state);
+  });
   render(machine.snapshot);
 
   ticker = setInterval(() => {
@@ -356,6 +366,7 @@ function mountSession(root: HTMLElement, ctx: AppContext, machine: PlaybackMachi
 
   return () => {
     unsubscribe();
+    ctx.lift.disarm();
     if (ticker) clearInterval(ticker);
     document.removeEventListener('keydown', onKey);
     stage.replaceChildren();

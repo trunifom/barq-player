@@ -224,10 +224,20 @@ export class CameraAdapter {
     try {
       return await this.start(next);
     } catch (error: unknown) {
+      let restoreFailure: unknown = null;
       try {
         await this.start(previousOptions);
-      } catch {
-        // Wiederherstellung gescheitert: die Sitzung bleibt beendet, gemeldet wird der ursprüngliche Fehler.
+      } catch (restoreError: unknown) {
+        restoreFailure = restoreError; // Sitzung bleibt beendet; der Fehler wird unten im Detail mitgemeldet
+      }
+      if (restoreFailure !== null && isAppError(error)) {
+        const why = restoreFailure instanceof Error ? restoreFailure.message : String(restoreFailure);
+        throw new AppError(error.code, {
+          details: `${error.details ?? error.message}; Wiederherstellung der vorherigen Kamera gescheitert: ${why}`,
+          cause: error,
+          userMessage: error.userMessage,
+          recoveryHint: error.recoveryHint
+        });
       }
       throw error;
     }

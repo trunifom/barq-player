@@ -10,6 +10,7 @@ import { CameraAdapter } from '../adapters/camera/camera-adapter';
 import { HybridDecoder } from '../adapters/decoder/decoder-adapter';
 import { FeedbackAdapter } from '../adapters/feedback/feedback-adapter';
 import { RenderCache } from '../adapters/renderer/barcode-renderer';
+import { LiftDetector, type LiftDetectorDeps, type LiftTrigger, type MotionTarget } from '../adapters/sensors/lift-detector';
 import { WakeLockManager, type WakeLockApi } from '../adapters/wakelock/wake-lock';
 import { BackupService } from '../application/backup-service';
 import { CaptureService } from '../application/capture-service';
@@ -17,6 +18,7 @@ import { CollectionService } from '../application/collection-service';
 import { PlaybackController } from '../application/playback-service';
 import { SessionService } from '../application/session-service';
 import { SettingsStore, type KeyValueStorage } from '../application/settings-store';
+import { UpdatePolicy } from '../offline/update-policy';
 import { Notifier, type NoticeTimers } from '../ui/components/notifier';
 import { formatRoute, type Route } from './routes';
 import { APP_VERSION } from './version';
@@ -36,6 +38,10 @@ export interface AppContext {
   readonly notify: Notifier;
   readonly settings: SettingsStore;
   readonly renderCache: RenderCache;
+  /** Optionaler Lift-to-Pause-Sensor (kann nur pausieren). */
+  readonly lift: LiftDetector;
+  /** Update-Policy (neue Version nie mitten in einer Sitzung aktivieren). */
+  readonly updates: UpdatePolicy;
   /** Browser-Speicherverwaltung (`navigator.storage`), falls vorhanden. */
   readonly storageManager: StorageManagerLike | undefined;
   /** Aktueller Decoder (wird bei geänderter Format-Whitelist ersetzt). */
@@ -60,6 +66,10 @@ export interface AppOverrides {
   camera?: CameraAdapter;
   wakeLockApi?: WakeLockApi | undefined;
   storageManager?: StorageManagerLike | undefined;
+  /** Ereignisquelle für Bewegungssensoren (`undefined` = nicht unterstützt). */
+  liftTarget?: MotionTarget | undefined;
+  liftTimers?: LiftDetectorDeps['timers'];
+  liftNow?: () => number;
   scheduler?: Scheduler;
   noticeTimers?: NoticeTimers;
   newId?: () => string;
@@ -121,6 +131,25 @@ export function createAppContext(env: AppEnvironment): AppContext {
   const renderCache = new RenderCache();
   const createDecoder = o.createDecoder ?? ((whitelist: readonly Symbology[]): HybridDecoder => new HybridDecoder({ whitelist }));
 
+  const liftText: Record<LiftTrigger, string> = {
+    tilt: 'Lift-to-Pause: Telefon wurde gekippt/angehoben',
+    shake: 'Lift-to-Pause: Telefon wurde bewegt',
+    'sensor-lost': 'Lift-to-Pause: keine Sensordaten mehr'
+  };
+  const motionWindow = env.win as unknown as MotionTarget & { DeviceMotionEvent?: { requestPermission?: () => Promise<'granted' | 'denied'> } };
+  const motionApi = motionWindow.DeviceMotionEvent;
+  const lift = new LiftDetector({
+    target: 'liftTarget' in o ? o.liftTarget : 'DeviceMotionEvent' in env.win ? motionWindow : undefined,
+    // Der Sensor darf AUSSCHLIESSLICH pausieren (Symbol sofort aus), nie fortsetzen oder bestätigen.
+    onTrigger: (reason) => {
+      playback.pauseActive('sensor', liftText[reason]);
+    },
+    ...(motionApi?.requestPermission ? { requestPermission: () => (motionApi.requestPermission as () => Promise<'granted' | 'denied'>).call(motionApi) } : {}),
+    now: o.liftNow ?? nowMs,
+    ...(o.liftTimers ? { timers: o.liftTimers } : {})
+  });
+  const updates = new UpdatePolicy({ isSessionLive: () => playback.isLive });
+
   let decoder: HybridDecoder;
   let capture: CaptureService;
   const reconfigureCapture = (): void => {
@@ -145,6 +174,8 @@ export function createAppContext(env: AppEnvironment): AppContext {
     notify,
     settings,
     renderCache,
+    lift,
+    updates,
     storageManager: 'storageManager' in o ? o.storageManager : (env.win.navigator as { storage?: StorageManagerLike }).storage,
     getDecoder: () => decoder,
     getCapture: () => capture,

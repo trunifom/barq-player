@@ -227,7 +227,11 @@ describe('Kamerawechsel', () => {
     });
     const cam = new CameraAdapter(env(gum));
     await cam.start();
-    await expect(cam.switchCamera()).rejects.toMatchObject({ code: 'ERR_CAMERA_NOT_FOUND', userMessage: expect.stringContaining('anderen App') });
+    await expect(cam.switchCamera()).rejects.toMatchObject({
+      code: 'ERR_CAMERA_NOT_FOUND',
+      userMessage: expect.stringContaining('anderen App'),
+      details: expect.stringContaining('Wiederherstellung der vorherigen Kamera gescheitert') // der zweite Fehler geht nicht verloren
+    });
     expect(cam.current).toBeNull();
   });
 

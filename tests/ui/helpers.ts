@@ -2,6 +2,7 @@ import { vi } from 'vitest';
 import { createAppContext, type AppContext, type AppEnvironment } from '../../src/app/container';
 import type { StorageManagerLike } from '../../src/adapters/persistence/db';
 import type { WakeLockApi } from '../../src/adapters/wakelock/wake-lock';
+import type { MotionTarget } from '../../src/adapters/sensors/lift-detector';
 import type { Dispose, Route } from '../../src/app/routes';
 import type { CameraAdapter, CameraSession } from '../../src/adapters/camera/camera-adapter';
 import type { DecodedCode, DecoderPort, FileScanResult, FrameResult, HybridDecoder } from '../../src/adapters/decoder/decoder-adapter';
@@ -70,6 +71,7 @@ export interface TestEnv {
   decoder: FakeDecoder;
   camera: FakeCamera;
   noticeTimers: ManualScheduler;
+  liftSched: ManualScheduler;
   clock: { ms: number };
 }
 
@@ -79,10 +81,11 @@ let counter = 0;
  * Erzeugt eine vollständig kontrollierbare Umgebung (Zeit, Decoder, Kamera, Speicher).
  * @param over - optionale Überschreibungen (Einstellungsspeicher, Speicherverwaltung, Wake-Lock-API).
  */
-export function testEnv(over: { storage?: KeyValueStorage | null; storageManager?: StorageManagerLike; wakeLockApi?: WakeLockApi } = {}): TestEnv {
+export function testEnv(over: { storage?: KeyValueStorage | null; storageManager?: StorageManagerLike; wakeLockApi?: WakeLockApi; liftTarget?: MotionTarget } = {}): TestEnv {
   (HTMLMediaElement.prototype as unknown as { play: () => Promise<void> }).play = () => Promise.resolve();
   const sched = new ManualScheduler();
   const noticeTimers = new ManualScheduler();
+  const liftSched = new ManualScheduler();
   const decoder = new FakeDecoder();
   const camera = new FakeCamera();
   const clock = { ms: 0 };
@@ -102,10 +105,13 @@ export function testEnv(over: { storage?: KeyValueStorage | null; storageManager
       nowIso: () => `2026-11-24T10:00:${String(++t % 60).padStart(2, '0')}.000Z`,
       nowMs: () => clock.ms,
       wakeLockApi: over.wakeLockApi,
-      storageManager: over.storageManager
+      storageManager: over.storageManager,
+      liftTimers: liftSched,
+      liftNow: () => clock.ms,
+      liftTarget: over.liftTarget // Standard in Tests: keine Bewegungssensoren (jsdom bietet DeviceMotionEvent an)
     }
   };
-  return { env, sched, decoder, camera, noticeTimers, clock };
+  return { env, sched, decoder, camera, noticeTimers, liftSched, clock };
 }
 
 export interface UiSetup {
@@ -115,6 +121,7 @@ export interface UiSetup {
   decoder: FakeDecoder;
   camera: FakeCamera;
   noticeTimers: ManualScheduler;
+  liftSched: ManualScheduler;
   clock: { ms: number };
   dispose: Dispose | null;
   mount(fn: (root: HTMLElement, ctx: AppContext, route: Route) => Dispose, route?: Route): void;
@@ -122,7 +129,7 @@ export interface UiSetup {
 }
 
 /** Erzeugt Kontext und leeres Wurzelelement für Screen-Tests. */
-export function setupUi(over: { storage?: KeyValueStorage | null; storageManager?: StorageManagerLike } = {}): UiSetup {
+export function setupUi(over: { storage?: KeyValueStorage | null; storageManager?: StorageManagerLike; liftTarget?: MotionTarget } = {}): UiSetup {
   const te = testEnv(over);
   document.body.replaceChildren();
   const root = document.createElement('div');
@@ -135,6 +142,7 @@ export function setupUi(over: { storage?: KeyValueStorage | null; storageManager
     decoder: te.decoder,
     camera: te.camera,
     noticeTimers: te.noticeTimers,
+    liftSched: te.liftSched,
     clock: te.clock,
     dispose: null,
     mount(fn, route = { name: 'scanner', params: {} }) {

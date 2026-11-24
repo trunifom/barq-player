@@ -105,6 +105,7 @@ Greedy nach größter Restmenge ohne direkten Vorgänger gleicher Identität (`k
 | `ERR_WASM_LOAD_FAILED`, `ERR_DECODE_FAILED` | Decoder (WASM fehlt/passt nicht; Bild unlesbar/zu groß) | `decoder-adapter` |
 | `ERR_RENDER_FAILED` | Darstellung nicht möglich (z. B. QR zu lang für ECC) | `barcode-renderer` |
 | `ERR_NOT_FOUND` | Sammlung/Eintrag existiert nicht (mehr) | Services |
+| `ERR_OFFLINE_SETUP_FAILED` | Service Worker/Offline-Einrichtung oder Aktivierung einer neuen Version fehlgeschlagen | `update-policy`, `service-worker` |
 | `ERR_STORAGE_WRITE_FAILED`, `ERR_STORAGE_QUOTA_EXCEEDED` | Persistenz | M3 |
 | `ERR_IMPORT_SCHEMA_INVALID`, `ERR_IMPORT_CSV_INVALID` | Import | M3 |
 | `ERR_PLAYBACK_FAILED` | Laufzeitfehler im Player (→ Symbol sofort ausblenden) | M2/M6 |
@@ -183,10 +184,30 @@ Balkenhöhe (Module, ohne Klartext): EAN-13/UPC-A 69, EAN-8 65, Code 128 50.
 ## 6. Offline-/WASM-Strategie
 - `zxing-wasm` lädt `./wasm/zxing_reader.wasm` über `locateFile`; kein CDN zur Laufzeit.
 - `npm run copy:wasm` kopiert die zur installierten Bibliotheksversion passende Datei aus `node_modules/zxing-wasm/dist/reader/` nach `public/wasm/` (Bibliothek und WASM müssen versionsgleich sein).
-- `vite-plugin-pwa` (generateSW, `registerType: 'prompt'`) legt alle Assets inkl. `.wasm` in den Precache. Baseline-Build M0: 7 Einträge, ca. 926 KiB.
+- `vite-plugin-pwa` (generateSW, `registerType: 'prompt'`) legt alle Assets inkl. `.wasm` in den Precache.
+
+### Offline-Härtung (Meilenstein 7)
+**Precache (F-14):** Aktueller Produktions-Build: 15 Einträge (≈ 2,1 MiB) – App-Shell, JS/CSS (inkl. dynamisch geladenem `ponyfill`-Chunk), Manifest, drei Icons und `wasm/zxing_reader.wasm`. Der Test `tests/build/production-build.test.ts` baut die App in ein temporäres Verzeichnis und prüft: warnungsfreier Build, WASM/Shell/Manifest/Icons im Precache, **jede** ausgelieferte Datei im Precache, keine absoluten/externen URLs, Navigation fällt auf `index.html` zurück, `skipWaiting` nur im `SKIP_WAITING`-Nachrichtenhandler, `clientsClaim` nicht gesetzt, ausgelieferte WASM-Datei **byte-identisch** mit der Datei der installierten `zxing-wasm`-Version, `barcode-detector` bringt keine zweite `zxing-wasm`-Version mit.
+
+**Update-Policy (`src/offline/update-policy.ts`, `service-worker.ts`, `ui/components/update-banner.ts`, Q-06):** Der Service Worker läuft mit `registerType: 'prompt'`: Eine neue Version **wartet**; sie wird nie automatisch aktiviert. `UpdatePolicy.apply()` gibt die Aktivierung (und damit den Seiten-Reload) nur frei, wenn eine Bedienperson sie ausdrücklich auslöst **und** keine Fader-Sitzung läuft oder pausiert ist (`PlaybackController.isLive`); die Bedingung wird beim Klick erneut geprüft. Der Hinweis in der Kopfzeile ist während einer Sitzung gesperrt und erklärt warum; nach Sitzungsende wird er automatisch frei (1-s-Neuprüfung). „Die App ist jetzt offline nutzbar“ wird erst gemeldet, wenn der Service Worker den Precache bestätigt (`onOfflineReady`). Registrierungs-/Aktivierungsfehler → `ERR_OFFLINE_SETUP_FAILED`. Die Registrierung (`virtual:pwa-register`) wird nur im Produktionsbuild und dynamisch aus `main.ts` geladen, damit Tests nie das virtuelle Modul brauchen.
+
+**PWA-Installierbarkeit (Q-07):** `manifest.webmanifest` mit `id`, `start_url`/`scope` `./`, `display: standalone`, `lang: de`, Theme-/Hintergrundfarbe; Icons `icon-192.svg`, `icon-512.svg` (any) und `icon-maskable.svg` (Motiv in der inneren 80 %-Sicherheitszone) unter `public/icons/`; `index.html` mit `color-scheme: light`, Icon- und Apple-Touch-Verweisen. Alle Pfade relativ (`base: './'`), damit Unterpfad-Hosting (z. B. GitHub Pages) funktioniert.
+
+### Lift-to-Pause (`src/domain/lift-detection.ts`, `src/adapters/sensors/lift-detector.ts`, S-06)
+Optional und **standardmäßig aus** (Einstellungen → „Lift-to-Pause“, nur sichtbar aktivierbar, wenn der Browser `devicemotion` anbietet; iOS-Berechtigung wird beim Einschalten angefragt). Die reine `LiftAnalyzer`-Logik misst 800 ms eine Ruhelage (mittlerer Schwerkraftvektor) und löst danach aus bei Kippwinkel ≥ 25° (`tilt`) oder Betragsabweichung ≥ 3 m/s² (`shake`), jeweils über mindestens 3 aufeinanderfolgende Messwerte; Schwerelosigkeit/Ausfall zählt als starke Veränderung. Der Adapter schaltet nur **scharf**, solange das Telefon bereit liegt (Zustände SHOWING, BLANKING, WAITING_CONFIRMATION – nie im Countdown), überwacht den Sensor (**2 s ohne Messwerte = `sensor-lost`**, konservativ pausieren) und löst genau einmal aus. **Der Sensor kann ausschließlich pausieren:** Sein einziger Ausgang ist `onTrigger`, der in der App `pauseActive('sensor', …)` ruft; es gibt keinen Pfad zu `resume`/`confirm`/`pos-accepted` (per Quelltext-Test abgesichert). Nach einer Auslösung wird erst nach bewusster Wiederaufnahme (Countdown) erneut scharf geschaltet.
 
 ## 7. Testkonzept
-Vitest; Unit-Tests in `tests/unit/`, Integration in `tests/integration/` (`fake-indexeddb`, `jsdom` bei Bedarf). Quality Gate vor jedem Commit: `npm test` und `npm run build` fehlerfrei. Jede Logik in `src/domain/` braucht Unit-Tests.
+Vitest. Quality Gate vor jedem Commit: `npm test` und `npm run build` (0 TypeScript-Fehler, 0 Warnungen). Jede Logik in `src/domain/` braucht Unit-Tests.
+
+| Ordner | Inhalt | Umgebung |
+|---|---|---|
+| `tests/unit/` | Fachlogik (Domain), Adapter mit Attrappen (Kamera, Decoder, Feedback, Wake Lock, Sensor), Renderer inkl. Rückleseprüfung mit lokalem zxing-wasm, Router, Lebenszyklus, Einstellungen, Qualitätsregeln | node |
+| `tests/integration/` | Dexie-Persistenz, Services, Backup/Restore (Rollback), Capture mit Datenbank, Decoder mit echtem Ponyfill und lokalem WASM | node + `fake-indexeddb` |
+| `tests/ui/` | Screens, Komponenten, Bootstrap, Sicherheitsinvarianten des Faders (Symbol nur in SHOWING, Blank bei Pause/Fehler/Hintergrund, Navigation gesperrt, globale Fehler), Update-Banner, Lift-to-Pause | jsdom (`// @vitest-environment jsdom`) |
+| `tests/build/` | Produktions-Build, Precache, Manifest, Icons, WASM-Version | node (Vite programmatisch) |
+| `tests/helpers/` | `ManualScheduler`, Decode-Helfer (Rasterung → zxing-wasm) | – |
+
+**Qualitätsregeln als Tests (`tests/unit/quality.test.ts`):** TSDoc direkt an jedem Export, Dateiköpfe, kein `any`, keine Compiler-Unterdrückung, `strict`/`noUnused*` aktiv, keine leeren `catch`-Blöcke, `src/domain/` ohne Browser-/Timer-APIs und nur Domain-Importe, Schichtengrenzen (adapters ↛ application/ui/app, application ↛ ui/app), Sensor-Code ohne `resume`/`confirm`, Fachregeln (String-Werte, kein `pos-*` aus der Maschine, `#000000`/`#FFFFFF`/`crispEdges`, keine Fader-Animationen) sowie Vollständigkeit der Dokumente (README-Links, F-01…F-15, Ledger-Format, Kapitel, Fehlercodes ↔ Dokumentation).
 
 Hinweis Windows: Vitest aus Git Bash gestartet scheitert wegen Pfad-Schreibweise (`c:` vs. `C:`, doppelte Modulinstanzen, „failed to find the current suite“). Tests aus PowerShell/cmd starten.
 
@@ -333,3 +354,18 @@ Entscheidung: Bei unbehandelten Fehlern ruft der Lebenszyklus `failActive` vor `
 
 ### ADR-38: Bedieneinstellungen in `localStorage`, Sachdaten in IndexedDB
 Entscheidung: `SettingsStore` (abgesichert, mit Standardwerten bei Fehlern) für Komfort-Einstellungen; alles Fachliche in Dexie/Backup. Grund: Einstellungen sind klein und synchron nötig; ihr Verlust ist unkritisch und im Backup nicht erforderlich.
+
+### ADR-39: Service Worker mit `prompt` und expliziter Update-Policy
+Entscheidung: Neue Versionen warten; Aktivierung nur auf Klick und nur ohne laufende/pausierte Fader-Sitzung. Grund: Spezifikation 19.4 („Neue Version nicht mitten in einer Sitzung aktivieren“); ein Reload beendet die Sitzung und lässt einen unklaren Übergabebereich zurück.
+
+### ADR-40: SVG-Icons statt PNG
+Entscheidung: Einfache SVG-Icons (192, 512, maskable) unter `public/icons/`. Grund: Vorgabe „einfache PWA-SVG-Icons“, keine Binärdateien im Repository, skalierbar; Chrome Android akzeptiert SVG-Manifest-Icons. Bei Bedarf können PNG-Varianten ergänzt werden.
+
+### ADR-41: Lift-to-Pause konservativ, nur pausierend, Sensorverlust pausiert
+Entscheidung: Standardmäßig aus; scharf nur bei Anzeige/Wechsel/Warten; Schwellen 25° / 3 m/s² / 3 Messwerte; 2 s ohne Messwerte pausieren; der Sensor hat keinen Zugriff auf Fortsetzen oder Bestätigen. Grund: Spezifikation 13.5 – ein Sensorsignal darf höchstens pausieren und beweist keine Buchung; ein unnötiger Halt ist lästig, eine falsche Freigabe kann den Stapel unbemerkt beschädigen. Die Schwellen sind Startwerte und an der echten Hardware zu prüfen.
+
+### ADR-42: Qualitätsregeln und Produktions-Build als Tests
+Entscheidung: TSDoc-, `any`-, Schichten- und Dokumentationsregeln sowie der Precache-Check laufen als Vitest-Tests. Grund: AGENTS.md-Regeln bleiben bei jedem Commit automatisch erzwungen, nicht nur dokumentiert; der Offline-Nachweis (WASM im Precache, byte-identisch zur Bibliotheksversion) ist reproduzierbar.
+
+### ADR-43: Windows/Git-Bash-Hinweis für Skripte
+Entscheidung: Tests und Builds unter Windows aus PowerShell/cmd starten (nicht aus Git Bash). Grund: Pfad-Schreibweise `c:` vs. `C:` führt zu doppelten Modulinstanzen in Vitest (siehe Testkonzept).

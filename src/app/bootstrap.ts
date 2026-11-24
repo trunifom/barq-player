@@ -4,6 +4,7 @@
  */
 import { requestPersistentStorage } from '../adapters/persistence/db';
 import { h, setChildren } from '../ui/components/dom';
+import { mountUpdateBanner } from '../ui/components/update-banner';
 import { mountCollections } from '../ui/screens/collections';
 import { mountGenerator } from '../ui/screens/generator';
 import { mountPlayer } from '../ui/screens/player';
@@ -41,6 +42,7 @@ export function bootstrap(host: HTMLElement, env: AppEnvironment): RunningApp {
   const ctx = createAppContext(env);
   const main = h('main', { id: 'screen', class: 'app__main', tabindex: '-1' });
   const toasts = h('div', { id: 'toasts', class: 'toasts' });
+  const updateHost = h('div', { id: 'update-host', hidden: true });
   const navButtons = new Map<RouteName, HTMLElement>();
   const nav = h(
     'nav',
@@ -51,7 +53,7 @@ export function bootstrap(host: HTMLElement, env: AppEnvironment): RunningApp {
       return a;
     })
   );
-  setChildren(host, h('header', { class: 'app__header' }, h('span', { class: 'app__title' }, 'BarQPlayer')), main, nav, toasts);
+  setChildren(host, h('header', { class: 'app__header' }, h('span', { class: 'app__title' }, 'BarQPlayer')), updateHost, main, nav, toasts);
   ctx.notify.mount(toasts);
 
   const mountScreen = (route: Route): Dispose => {
@@ -94,6 +96,17 @@ export function bootstrap(host: HTMLElement, env: AppEnvironment): RunningApp {
     reacquireWakeLock: () => ctx.wakeLock.reacquireIfNeeded()
   });
 
+  const unmountBanner = mountUpdateBanner(updateHost, ctx.updates, (error) => void ctx.notify.error(error, { source: 'offline-setup' }));
+  let offlineAnnounced = false;
+  const unsubscribeUpdates = ctx.updates.subscribe((s) => {
+    // Erst melden, wenn der Service Worker den Precache tatsächlich abgeschlossen hat.
+    if (s.phase === 'offline-ready' && !offlineAnnounced) {
+      offlineAnnounced = true;
+      ctx.notify.success('Die App ist jetzt offline nutzbar.');
+    }
+  });
+  if (ctx.settings.get().liftToPause) void ctx.lift.enable();
+
   router.start();
   // Persistenten Speicher still anfragen; das Ergebnis zeigt „Einstellungen → Speicher“.
   void requestPersistentStorage(ctx.storageManager).then((s) => {
@@ -105,6 +118,9 @@ export function bootstrap(host: HTMLElement, env: AppEnvironment): RunningApp {
     router,
     dispose: () => {
       uninstall();
+      unmountBanner();
+      unsubscribeUpdates();
+      ctx.lift.disable();
       router.stop();
       ctx.camera.stop();
     }
