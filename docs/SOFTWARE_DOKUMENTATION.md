@@ -24,8 +24,37 @@ Abhängigkeiten zeigen nur nach innen (`domain` kennt niemanden).
 ## 2. Datenmodell
 Siehe Spezifikation Kap. 16. Barcodes immer als `string`. Das Dexie-Schema (Meilenstein 3) wird hier mit Versionsstand dokumentiert.
 
-## 3. Zustandsautomat
-Wird in Meilenstein 2 dokumentiert (Diagramm, Übergangsregeln).
+## 3. Zustandsautomat (`src/domain/playback-machine.ts`)
+
+```text
+            start()                     Startverzögerung
+ IDLE ───────────────► VALIDATING ──ok──► COUNTDOWN ───────────► SHOWING ◄──────────────┐
+                           │ (Liste ungültig)                      │ displayMs          │ blank-Zeit
+                           ▼                                       ▼                    │ (blankMs bzw.
+                         ERROR                    auto/Stapel ► BLANKING ───────────────┘  identicalBlankMs)
+                                                  manuell / Stapelende ► WAITING_CONFIRMATION
+                                                                          │ confirm()
+                                                                          └──► BLANKING ► SHOWING … ► FINISHED
+
+ COUNTDOWN | SHOWING | BLANKING | WAITING_CONFIRMATION ──pause(quelle)──► PAUSED
+ jeder aktive Zustand (+PAUSED) ──fail(e)──► ERROR
+ PAUSED | ERROR ──resume(entscheidung)──► COUNTDOWN ► SHOWING …   (oder FINISHED)
+ jeder aktive Zustand ──abort()──► FINISHED (aborted)
+```
+
+**Übergangsregeln**
+- Das Symbol ist nur in `SHOWING` sichtbar (`snapshot.visibleEntry`); in allen anderen Zuständen ist die Fläche leer. Es gibt keine Überblendung; zwischen zwei Symbolen liegt immer `BLANKING` bzw. `WAITING_CONFIRMATION`.
+- `pause`, `fail`, `abort` und Hintergrundwechsel (`pause('background')`, vom Lifecycle-Adapter bei `visibilitychange`) wirken **synchron**: Timer löschen, Generation erhöhen, Symbol aus.
+- **Generation-IDs:** Jeder Timer merkt sich die Generation bei der Planung und tut nichts, wenn sie sich geändert hat – auch wenn ein Scheduler `clearTimeout` ignoriert (Race-Condition-Tests).
+- **Blank-Zeiten:** `identicalBlankMs`, wenn Symbologie und Wert des Folgecodes gleich sind, sonst `blankMs`.
+- **Modi:** `auto` (ohne Rückkanal, läuft bis `FINISHED`), `manual` (nach jeder Anzeige `WAITING_CONFIRMATION`), `batch` (nach `batchSize` Anzeigen und am Listenende `WAITING_CONFIRMATION`).
+- **Fortsetzen:** immer über `COUNTDOWN` (Startverzögerung, leere Fläche). Entscheidungen: `reconciled` (bis zur letzten Anzeige manuell bestätigt, weiter danach), `repeat` (ab erster unbestätigter Position; `doubleBookingRisk=true`), `skip` (ohne Bestätigung nach der letzten Anzeige weiter, protokolliert), `from-position`. Verpasste Positionen werden nie automatisch nachgeholt.
+- **Unklarer Übergabebereich:** `uncertainRange = [unresolvedFrom … highestDisplayedIndex]`; `lastConfirmedIndex` ist die zuletzt MANUELL bestätigte Position. `displayed` (Evidenz `player`) und `manual-confirmed` (Evidenz `operator`) sind getrennte Ereignisse; `pos-accepted`/`pos-rejected` erzeugt die Maschine nie (F-15).
+- **Fehlersicherheit:** Wirft ein UI-Listener (Unsicherheit, ob das Symbol ausgeblendet wurde), geht die Maschine in `ERROR` und meldet den Fehler über `onInternalError`.
+- **Ereignisprotokoll:** `PlaybackEvent[]` mit `displayed`, `blanked`, `paused`, `manual-confirmed`, `uncertain`; Details enthalten Positionsnummern, nie Barcode-Werte.
+
+### Interleaver (`src/domain/interleaver.ts`)
+Greedy nach größter Restmenge ohne direkten Vorgänger gleicher Identität (`keyOf`); Gleichstand → zuerst aufgetretener Wert; Reihenfolge innerhalb eines Werts bleibt. Optimal, wenn der häufigste Wert ≤ ⌈n/2⌉ ist; sonst bleibt `maxCount − (n − maxCount) − 1` unvermeidbare Nachbarn (Statistik). Listen ohne identische Nachbarn bleiben unverändert; abschaltbar (`enabled: false`).
 
 ## 4. Fehlerkonzept und Error-Code-Katalog (`src/domain/errors.ts`)
 
@@ -93,6 +122,15 @@ Entscheidung: Die Summe aus Präfix, Feld und festem Teil muss exakt 12 (EAN-13)
 
 ### ADR-11: Leerraum-Regeln im Bulk-Parser
 Entscheidung: Nur bei EAN/UPC werden Leerzeichen/Tabs innerhalb der Zeile entfernt; QR bleibt unverändert, Code 128 wird nur an den Rändern getrimmt. Grund: Spezifikation 6.5 (QR nicht mit EAN-Regeln behandeln).
+
+### ADR-12: Zustandsmaschine mit injiziertem Scheduler
+Entscheidung: `PlaybackMachine` ist eine kleine Klasse mit injiziertem `Scheduler` statt eines reinen Reducers plus separatem Timer-Code. Grund: Timer, Generation-ID und Zustand müssen atomar zusammenwirken; Tests können Zeit deterministisch steuern (ManualScheduler) und zusätzlich mit Vitest-Fake-Timern prüfen. Die Domain bleibt browserfrei.
+
+### ADR-13: Manuell = zeitbegrenzte Anzeige + Bestätigung
+Entscheidung: Auch im manuellen Modus wird das Symbol nach `displayMs` ausgeblendet (Spezifikation 12.2 A); die Bestätigung öffnet den Weg zur nächsten Position über `BLANKING`. Eine „Dauer anzeigen“-Option gehört nicht zur sicheren Playerpause (Spezifikation 11.3) und ist nicht Teil der Maschine.
+
+### ADR-14: Interleaver sortiert nur bei Bedarf
+Entscheidung: Ohne identische Nachbarn bleibt die Reihenfolge unverändert. Grund: Die Reihenfolge der Sammlung soll nicht ohne Not verändert werden.
 
 ### ADR-07: Toolchain-Versionen
 Entscheidung: Aktuelle Releases (TypeScript 7, Vite 8, Vitest 5) wie von `npm install` aufgelöst; Versionen sind durch `package-lock.json` fixiert. `@types/node` nur für Tests (`types: ["node"]`); `src/domain/` bleibt frei von Node-/Browser-APIs.

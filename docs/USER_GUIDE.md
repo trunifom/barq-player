@@ -29,4 +29,13 @@ Beispiel `2 063701 028{XX}{C}` mit Schritt `+12`:
 
 Pro Zeile ein Code. Fehlerhafte Zeilen werden mit Zeilennummer gemeldet (z. B. „Zeile 7: Prüfziffer falsch (erwartet 1 …)“) und **nicht** automatisch korrigiert. Leerzeilen werden ignoriert.
 
+## Vorab: Wie der Kassen-Fader arbeitet (Bedienung folgt in Meilenstein 6)
+
+- Zwischen zwei Codes ist die Fläche immer **leer (weiß)** – es gibt nie eine Überblendung.
+- Bei **Pause, Fehler oder Wechsel in eine andere App/einen anderen Tab** verschwindet der Code **sofort**, damit die Kasse ihn nicht doppelt liest.
+- Modi: **Manuell** (jede Position nach Ihrer Bestätigung), **Automatik** (ohne Rückmeldung der Kasse; nur „angezeigt“ wird protokolliert) und **Kleinstapel** (nach N Codes wird auf Ihre Bestätigung gewartet).
+- Nach einer Unterbrechung zeigt die App den **unklaren Bereich**: Positionen, die angezeigt, aber von Ihnen nicht bestätigt wurden. Sie wählen: **abgeglichen** (Kasse geprüft), **wiederholen** (Vorsicht: Doppelbuchung möglich), **überspringen** oder **ab Position** fortsetzen. Es wird nie automatisch nachgeholt. Fortgesetzt wird immer mit einem kurzen Countdown.
+- „Bestätigt“ heißt: **Sie** haben an der Kasse nachgesehen – nicht, dass die Kasse es gemeldet hat.
+- **Identische Artikel nacheinander** liest mancher Scanner nur verzögert. Der Schalter „Smart-Interleaving“ mischt die Reihenfolge so, dass gleiche Codes möglichst nicht direkt aufeinander folgen.
+
 **Wichtig vorab:** BarQPlayer zeigt Codes an. „Angezeigt“ bedeutet nie „an der Kasse gebucht“.
