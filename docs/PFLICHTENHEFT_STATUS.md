@@ -13,14 +13,14 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | M0-04 | Vitest-Konfiguration, TS-Typen | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | `vitest.config.ts`, `tsconfig.json`, `src/vite-env.d.ts` | Smoke |
 | M0-05 | Dokumentations-Grundstruktur (4 Säulen) | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | `docs/*.md`, `README.md` | – |
 | F-01a | Format-Typen EAN-13/EAN-8/QR/Code 128/UPC-A als `string` | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/types.ts` | types (kompiliert) |
-| F-01b | Capture: Kamera-Decode EAN-13/EAN-8/Text-QR | In Arbeit | 2026-11-24 | 22:03:55 | #006 `73935fa` | `adapters/camera`, `adapters/decoder`, `application/capture-service.ts` | `camera-adapter.test.ts`, `decoder-adapter.test.ts`, `decoder-real.test.ts`, `capture-service.test.ts`, `duplicate-filter.test.ts`, `detection.test.ts` (UI in M6) |
-| F-02 | Bildimport (File/Blob, Multi-Code) | In Arbeit | 2026-11-24 | 22:03:55 | #006 `73935fa` | `adapters/decoder` | `decoder-adapter.test.ts`, `decoder-real.test.ts`, `capture-service.test.ts` (Foto-Import-UI in M6) |
+| F-01b | Capture: Kamera-Decode EAN-13/EAN-8/Text-QR | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | `adapters/camera`, `adapters/decoder`, `application/capture-service.ts` | `camera-adapter.test.ts`, `decoder-adapter.test.ts`, `decoder-real.test.ts`, `capture-service.test.ts`, `duplicate-filter.test.ts`, `detection.test.ts` (UI in M6); UI: `scanner.test.ts` |
+| F-02 | Bildimport (File/Blob, Multi-Code) | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | `adapters/decoder` | `decoder-adapter.test.ts`, `decoder-real.test.ts`, `capture-service.test.ts` (Foto-Import-UI in M6); UI: `scanner.test.ts` |
 | F-03a | Manuelle Eingabe + Bulk-Parser (zeilenweise Fehler) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/bulk-parser.ts` | `bulk-parser.test.ts` (24) |
-| F-03b | Eingabe-UI | Offen | | | | `src/ui/screens/` | |
+| F-03b | Eingabe-UI | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | `src/ui/screens/` | `scanner.test.ts`, `validate-code-value.test.ts` |
 | F-04 | Sammlungen anlegen/benennen/bearbeiten | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/collection-service.ts` | `collection-service.test.ts` |
 | F-05 | Reihenfolge & Mengen persistent | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `adapters/persistence/db.ts` | `collection-service.test.ts`, `persistence.test.ts` |
 | F-06 | Einzelsymbol-Generator (bwip-js SVG) | Umgesetzt | 2026-11-24 | 21:51:17 | #005 `fb59b88` | `adapters/renderer/barcode-renderer.ts` | `barcode-renderer.test.ts` (inkl. Decode-Roundtrip), `barcode-renderer-dom.test.ts` |
-| F-07 | Manueller Player | In Arbeit | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts`, UI | `playback-machine.test.ts` (Domain; UI in M6) |
+| F-07 | Manueller Player | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | `domain/playback-machine.ts`, UI | `playback-machine.test.ts` (Domain; UI in M6); UI: `player.test.ts`, `bootstrap.test.ts`, `playback-controller.test.ts` |
 | F-08 | Zeitgesteuerter Player (Anzeige-/Leerzeit) | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
 | F-09 | Startverzögerung, Pause, sofortiges Ausblenden | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
 | F-10 | Unklarer Übergabebereich dokumentieren | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
@@ -29,16 +29,16 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | F-12 | Präfix-/Feldvorlagen (Start, Ende, Schritt, Überlauf-Stopp) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/sequence.ts` | `sequence.test.ts` |
 | F-13 | JSON-Sicherung & geprüftes Restore | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/backup-service.ts` | `backup-schema.test.ts`, `backup-service.test.ts` |
 | F-14 | Offline-Start (SW, Precache inkl. WASM) | Offen | | | | `vite.config.ts`, `src/offline/` | |
-| F-15 | Anzeige nie als „gebucht“ ausgeben | In Arbeit | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts`, UI | `playback-machine.test.ts` (Domain; UI in M6) |
+| F-15 | Anzeige nie als „gebucht“ ausgeben | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | `domain/playback-machine.ts`, UI | `playback-machine.test.ts` (Domain; UI in M6); UI: `player.test.ts` |
 | S-01 | CSV-Import/-Export (führende Nullen, Formel-Injection-Schutz) | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/backup-service.ts` | `csv.test.ts`, `csv-items.test.ts`, `backup-service.test.ts` |
 | S-02 | Artikelstamm-Abgleich (`catalogStatus/Source/CheckedAt`) | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/collection-service.ts` | `collection-service.test.ts`, `backup-service.test.ts` |
-| S-03 | Scannerprofile + 20er-Kalibrierung | Offen | | | | UI Einstellungen | |
+| S-03 | Scannerprofile + 20er-Kalibrierung | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | UI Einstellungen | `calibration.test.ts`, `player.test.ts`, `settings.test.ts` |
 | S-04 | Kleinstapel-Modus | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
 | S-05 | Smart-Interleaver | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `src/domain/interleaver.ts` | `interleaver.test.ts` |
 | S-06 | Lift-to-Pause-Sensor (nur pausieren) | Offen | | | | `adapters/sensors/lift-detector.ts` | |
-| S-07 | Sitzungsbericht | Offen | | | | UI | |
+| S-07 | Sitzungsbericht | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | UI | `player.test.ts` |
 | Q-01 | `AppError`-Hierarchie, Fehlercodes, ErrorLogger | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/errors.ts` | `errors.test.ts` |
-| Q-02 | Globale Fehlerabsicherung (`error`, `unhandledrejection`) → Blank | Offen | | | | `src/app/lifecycle.ts` | |
+| Q-02 | Globale Fehlerabsicherung (`error`, `unhandledrejection`) → Blank | Umgesetzt | 2026-11-24 | 22:35:29 | #007 `3c79ea9` | `src/app/lifecycle.ts` | `lifecycle.test.ts`, `bootstrap.test.ts` |
 | Q-03 | Rendering-Regeln (#000/#FFF, crispEdges, Ruhezonen, ganzzahlig, 90°-Drehung) | Umgesetzt | 2026-11-24 | 21:51:17 | #005 `fb59b88` | renderer | `render-layout.test.ts`, `barcode-renderer.test.ts` |
 | Q-04 | `strict`, kein `any`, TSDoc an allen Exporten | Offen | | | | alle | |
 | Q-05 | `navigator.storage.persist()` + Speicheranzeige | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `persistence/db.ts` | `persistence.test.ts` |
@@ -81,3 +81,8 @@ Tests: 408/408 grün (16 Dateien, +82), `npm run build` fehlerfrei. Hinweis: zxi
 `feat(capture)`: Kamera-Adapter, Hybrid-Decoder mit lokalem zxing-wasm, Feedback-Adapter, Capture-Service, Bildimport (F-01b, F-02: Adapter/Service umgesetzt, UI folgt in M6).
 Dateien: `src/adapters/{camera,decoder,feedback}/*`, `src/application/capture-service.ts`, `src/domain/{detection,duplicate-filter,qr-content}.ts`, `vite.config.ts` (`base: './'`), Tests (+126), Doku.
 Tests: 534/534 grün (27 Dateien), `npm run build` fehlerfrei, WASM im Precache.
+
+### #007 – `3c79ea9` – 2026-11-24 22:35:29
+`feat(ui)`: Mobile-First-Oberfläche (Scanner, Sammlungen, Generator, Fader, Einstellungen), Router mit Guard, globale Fehler-/Hintergrund-Absicherung, 20er-Kalibrierung, Wiedergabe-Controller (F-01b, F-02, F-03b, F-07, F-15, S-03, S-07, Q-02 umgesetzt).
+Dateien: `src/app/*`, `src/ui/{components,screens,styles}/*`, `src/application/{playback-service,settings-store}.ts`, `src/adapters/wakelock/wake-lock.ts`, `src/domain/{calibration,playback-entries}.ts`, `tests/ui/*`, Doku.
+Tests: 761/761 grün (41 Dateien, +227), `npm run build` ohne Warnungen.
