@@ -1,4 +1,4 @@
-# Pflichtenheft & Aufgabenheft – BarQPlayer
+﻿# Pflichtenheft & Aufgabenheft – BarQPlayer
 
 Quelle der Anforderungen: [`Barcode_Lager_App_Dokumentation.md`](Barcode_Lager_App_Dokumentation.md) (Kap. 9, 16, 17, 19, 20, 23) und [`../AGENTS.md`](../AGENTS.md).
 Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen fortlaufend (`#001`, …); Hashes sind echte Kurz-Hashes (`git log`), Ledger-Commits werden nicht gezählt.
@@ -7,11 +7,11 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 
 | Aufgaben-ID | Modul/Funktion | Status | Datum | Uhrzeit | Commit-Nr. & Hash | Dateien | Tests |
 |---|---|---|---|---|---|---|---|
-| M0-01 | Git-Setup, Branch `main`, Remote `origin` (kein Push) | In Arbeit | | | | – | – |
-| M0-02 | Dependencies (bwip-js, dexie, zxing-wasm, barcode-detector, vite, vite-plugin-pwa, vitest, jsdom, fake-indexeddb) | In Arbeit | | | | `package.json`, `package-lock.json` | Smoke |
-| M0-03 | Lokales WASM `public/wasm/zxing_reader.wasm` (`npm run copy:wasm`) | In Arbeit | | | | `public/wasm/zxing_reader.wasm` | Smoke |
-| M0-04 | Vitest-Konfiguration, TS-Typen | In Arbeit | | | | `vitest.config.ts`, `tsconfig.json`, `src/vite-env.d.ts` | Smoke |
-| M0-05 | Dokumentations-Grundstruktur (4 Säulen) | In Arbeit | | | | `docs/*.md`, `README.md` | – |
+| M0-01 | Git-Setup, Branch `main`, Remote `origin` (kein Push) | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | – | – |
+| M0-02 | Dependencies (bwip-js, dexie, zxing-wasm, barcode-detector, vite, vite-plugin-pwa, vitest, jsdom, fake-indexeddb) | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | `package.json`, `package-lock.json` | Smoke |
+| M0-03 | Lokales WASM `public/wasm/zxing_reader.wasm` (`npm run copy:wasm`) | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | `public/wasm/zxing_reader.wasm` | Smoke |
+| M0-04 | Vitest-Konfiguration, TS-Typen | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | `vitest.config.ts`, `tsconfig.json`, `src/vite-env.d.ts` | Smoke |
+| M0-05 | Dokumentations-Grundstruktur (4 Säulen) | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | `docs/*.md`, `README.md` | – |
 | F-01a | Format-Typen EAN-13/EAN-8/QR/Code 128/UPC-A als `string` | Offen | | | | `src/domain/types.ts` | |
 | F-01b | Capture: Kamera-Decode EAN-13/EAN-8/Text-QR | Offen | | | | `adapters/camera`, `adapters/decoder`, `application/capture-service.ts` | |
 | F-02 | Bildimport (File/Blob, Multi-Code) | Offen | | | | `adapters/decoder` | |
@@ -51,4 +51,8 @@ M0 Setup · M1 Errors/Typen/Checksum/Sequenz/Bulk · M2 Interleaver/Playback-Mac
 
 ## 3. Umsetzungsprotokoll (Changelog)
 
-_Noch keine abgeschlossenen Commits eingetragen._
+### #001 – `ee07e2c` – 2026-11-24 21:01:58
+`chore(init)`: Projekt-Setup, Dependencies, lokales WASM, Doku-Grundstruktur (M0-01 … M0-05).
+Geänderte Dateien: gesamtes Projektgerüst, `package.json`/`package-lock.json`, `vitest.config.ts`, `tsconfig.json`, `src/vite-env.d.ts`, `public/wasm/zxing_reader.wasm`, `tests/unit/smoke.test.ts`, vier Doku-Dateien.
+Tests: 1/1 grün, `npm run build` fehlerfrei (PWA-Precache 7 Einträge inkl. WASM).
+
