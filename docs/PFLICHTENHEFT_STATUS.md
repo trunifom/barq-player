@@ -17,8 +17,8 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | F-02 | Bildimport (File/Blob, Multi-Code) | Offen | | | | `adapters/decoder` | |
 | F-03a | Manuelle Eingabe + Bulk-Parser (zeilenweise Fehler) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/bulk-parser.ts` | `bulk-parser.test.ts` (24) |
 | F-03b | Eingabe-UI | Offen | | | | `src/ui/screens/` | |
-| F-04 | Sammlungen anlegen/benennen/bearbeiten | Offen | | | | `application/collection-service.ts` | |
-| F-05 | Reihenfolge & Mengen persistent | Offen | | | | `adapters/persistence/db.ts` | |
+| F-04 | Sammlungen anlegen/benennen/bearbeiten | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/collection-service.ts` | `collection-service.test.ts` |
+| F-05 | Reihenfolge & Mengen persistent | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `adapters/persistence/db.ts` | `collection-service.test.ts`, `persistence.test.ts` |
 | F-06 | Einzelsymbol-Generator (bwip-js SVG) | Offen | | | | `adapters/renderer/barcode-renderer.ts` | |
 | F-07 | Manueller Player | In Arbeit | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts`, UI | `playback-machine.test.ts` (Domain; UI in M6) |
 | F-08 | Zeitgesteuerter Player (Anzeige-/Leerzeit) | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
@@ -27,11 +27,11 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | F-11a | GS1-Modulo-10 (EAN-13/EAN-8/UPC-A) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/checksum.ts` | `checksum.test.ts` |
 | F-11b | Prüfziffer bei Generation berechnen | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/sequence.ts` | `sequence.test.ts` |
 | F-12 | Präfix-/Feldvorlagen (Start, Ende, Schritt, Überlauf-Stopp) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/sequence.ts` | `sequence.test.ts` |
-| F-13 | JSON-Sicherung & geprüftes Restore | Offen | | | | `application/backup-service.ts` | |
+| F-13 | JSON-Sicherung & geprüftes Restore | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/backup-service.ts` | `backup-schema.test.ts`, `backup-service.test.ts` |
 | F-14 | Offline-Start (SW, Precache inkl. WASM) | Offen | | | | `vite.config.ts`, `src/offline/` | |
 | F-15 | Anzeige nie als „gebucht“ ausgeben | In Arbeit | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts`, UI | `playback-machine.test.ts` (Domain; UI in M6) |
-| S-01 | CSV-Import/-Export (führende Nullen, Formel-Injection-Schutz) | Offen | | | | `application/backup-service.ts` | |
-| S-02 | Artikelstamm-Abgleich (`catalogStatus/Source/CheckedAt`) | Offen | | | | `application/collection-service.ts` | |
+| S-01 | CSV-Import/-Export (führende Nullen, Formel-Injection-Schutz) | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/backup-service.ts` | `csv.test.ts`, `csv-items.test.ts`, `backup-service.test.ts` |
+| S-02 | Artikelstamm-Abgleich (`catalogStatus/Source/CheckedAt`) | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/collection-service.ts` | `collection-service.test.ts`, `backup-service.test.ts` |
 | S-03 | Scannerprofile + 20er-Kalibrierung | Offen | | | | UI Einstellungen | |
 | S-04 | Kleinstapel-Modus | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `domain/playback-machine.ts` | `playback-machine.test.ts` |
 | S-05 | Smart-Interleaver | Umgesetzt | 2026-11-24 | 21:18:03 | #003 `ed64ae2` | `src/domain/interleaver.ts` | `interleaver.test.ts` |
@@ -41,7 +41,7 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | Q-02 | Globale Fehlerabsicherung (`error`, `unhandledrejection`) → Blank | Offen | | | | `src/app/lifecycle.ts` | |
 | Q-03 | Rendering-Regeln (#000/#FFF, crispEdges, Ruhezonen, ganzzahlig, 90°-Drehung) | Offen | | | | renderer | |
 | Q-04 | `strict`, kein `any`, TSDoc an allen Exporten | Offen | | | | alle | |
-| Q-05 | `navigator.storage.persist()` + Speicheranzeige | Offen | | | | `persistence/db.ts` | |
+| Q-05 | `navigator.storage.persist()` + Speicheranzeige | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `persistence/db.ts` | `persistence.test.ts` |
 | Q-06 | Update-Policy: kein Reload in aktiver Sitzung | Offen | | | | `src/offline/` | |
 | Q-07 | PWA-Icons + Manifest | Offen | | | | `public/icons/` | |
 
@@ -66,3 +66,8 @@ Tests: 98/98 grün (5 Dateien), `npm run build` fehlerfrei.
 `feat(domain)`: Smart-Interleaver und Fader-Zustandsmaschine (F-08, F-09, F-10, S-04, S-05 umgesetzt; F-07 und F-15 Domain-Teil, UI folgt in M6).
 Dateien: `src/domain/{interleaver,playback-machine}.ts`, `tests/unit/{interleaver,playback-machine}.test.ts`, Doku.
 Tests: 172/172 grün (7 Dateien, +74), `npm run build` fehlerfrei.
+
+### #004 – `0e03130` – 2026-11-24 21:44:10
+`feat(persistence)`: Dexie-Schema v1, Sammlungs-/Session-/Backup-Service, Artikelstamm, JSON-Backup (atomar, vorvalidiert), CSV mit Formelschutz (F-04, F-05, F-13, S-01, S-02, Q-05).
+Dateien: `src/adapters/persistence/db.ts`, `src/application/{collection,backup,session}-service.ts`, `src/domain/{csv,csv-items,backup-schema,profiles}.ts`, `tests/unit/{csv,csv-items,backup-schema}.test.ts`, `tests/integration/*`, `tests/setup.ts`, Doku, `.gitattributes`.
+Tests: 326/326 grün (13 Dateien, +154), `npm run build` fehlerfrei.
