@@ -13,8 +13,8 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | M0-04 | Vitest-Konfiguration, TS-Typen | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | `vitest.config.ts`, `tsconfig.json`, `src/vite-env.d.ts` | Smoke |
 | M0-05 | Dokumentations-Grundstruktur (4 Säulen) | Umgesetzt | 2026-11-24 | 21:01:58 | #001 `ee07e2c` | `docs/*.md`, `README.md` | – |
 | F-01a | Format-Typen EAN-13/EAN-8/QR/Code 128/UPC-A als `string` | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/types.ts` | types (kompiliert) |
-| F-01b | Capture: Kamera-Decode EAN-13/EAN-8/Text-QR | Offen | | | | `adapters/camera`, `adapters/decoder`, `application/capture-service.ts` | |
-| F-02 | Bildimport (File/Blob, Multi-Code) | Offen | | | | `adapters/decoder` | |
+| F-01b | Capture: Kamera-Decode EAN-13/EAN-8/Text-QR | In Arbeit | 2026-11-24 | 22:03:55 | #006 `73935fa` | `adapters/camera`, `adapters/decoder`, `application/capture-service.ts` | `camera-adapter.test.ts`, `decoder-adapter.test.ts`, `decoder-real.test.ts`, `capture-service.test.ts`, `duplicate-filter.test.ts`, `detection.test.ts` (UI in M6) |
+| F-02 | Bildimport (File/Blob, Multi-Code) | In Arbeit | 2026-11-24 | 22:03:55 | #006 `73935fa` | `adapters/decoder` | `decoder-adapter.test.ts`, `decoder-real.test.ts`, `capture-service.test.ts` (Foto-Import-UI in M6) |
 | F-03a | Manuelle Eingabe + Bulk-Parser (zeilenweise Fehler) | Umgesetzt | 2026-11-24 | 21:09:57 | #002 `054851a` | `src/domain/bulk-parser.ts` | `bulk-parser.test.ts` (24) |
 | F-03b | Eingabe-UI | Offen | | | | `src/ui/screens/` | |
 | F-04 | Sammlungen anlegen/benennen/bearbeiten | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `application/collection-service.ts` | `collection-service.test.ts` |
@@ -76,3 +76,8 @@ Tests: 326/326 grün (13 Dateien, +154), `npm run build` fehlerfrei.
 `feat(renderer)`: Barcode-/QR-Renderer mit ganzzahligen Modulen, Ruhezonen, 90°-Drehung und Lookahead-Cache (F-06, Q-03).
 Dateien: `src/domain/render-layout.ts`, `src/adapters/renderer/barcode-renderer.ts`, `src/domain/errors.ts`, `tests/unit/{render-layout,barcode-renderer,barcode-renderer-dom}.test.ts`, `tests/helpers/decode.ts`, Doku.
 Tests: 408/408 grün (16 Dateien, +82), `npm run build` fehlerfrei. Hinweis: zxing meldet UPC-A als `UPCA` mit 13-stelligem Text (für M5 vermerkt).
+
+### #006 – `73935fa` – 2026-11-24 22:03:55
+`feat(capture)`: Kamera-Adapter, Hybrid-Decoder mit lokalem zxing-wasm, Feedback-Adapter, Capture-Service, Bildimport (F-01b, F-02: Adapter/Service umgesetzt, UI folgt in M6).
+Dateien: `src/adapters/{camera,decoder,feedback}/*`, `src/application/capture-service.ts`, `src/domain/{detection,duplicate-filter,qr-content}.ts`, `vite.config.ts` (`base: './'`), Tests (+126), Doku.
+Tests: 534/534 grün (27 Dateien), `npm run build` fehlerfrei, WASM im Precache.
