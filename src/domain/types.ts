@@ -139,3 +139,21 @@ export interface CatalogProduct {
   importedAt: string;
   label?: string;
 }
+
+/** Status einer gespeicherten Wiedergabesitzung. */
+export type SessionStatus = 'running' | 'finished' | 'aborted' | 'error';
+
+/** Protokollkopf einer Wiedergabesitzung (Ereignisse liegen separat, siehe `PlaybackEvent`). */
+export interface SessionRecord {
+  id: string;
+  collectionId: string;
+  startedAt: string;
+  mode: 'manual' | 'auto' | 'batch';
+  /** App-Version zum Sitzungszeitpunkt (Spezifikation 19.4). */
+  appVersion: string;
+  profileId?: string;
+  entryCount: number;
+  /** Wurde Smart-Interleaving angewendet? */
+  interleaved: boolean;
+  status: SessionStatus;
+}

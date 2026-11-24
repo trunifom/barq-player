@@ -24,6 +24,7 @@ export type ErrorCode =
   | 'ERR_STORAGE_QUOTA_EXCEEDED'
   | 'ERR_IMPORT_SCHEMA_INVALID'
   | 'ERR_IMPORT_CSV_INVALID'
+  | 'ERR_NOT_FOUND'
   | 'ERR_PLAYBACK_FAILED'
   | 'ERR_UNKNOWN';
 
@@ -94,6 +95,10 @@ export const ERROR_CATALOG: Readonly<Record<ErrorCode, ErrorCatalogEntry>> = {
   ERR_IMPORT_CSV_INVALID: {
     userMessage: 'Die CSV-Datei enthält fehlerhafte Zeilen.',
     recoveryHint: 'Fehlerbericht pro Zeile beachten und Datei korrigieren.'
+  },
+  ERR_NOT_FOUND: {
+    userMessage: 'Der gesuchte Eintrag existiert nicht (mehr).',
+    recoveryHint: 'Liste neu laden und die Aktion wiederholen.'
   },
   ERR_PLAYBACK_FAILED: {
     userMessage: 'Bei der Wiedergabe ist ein Fehler aufgetreten. Das Symbol wurde ausgeblendet.',

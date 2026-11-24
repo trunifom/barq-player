@@ -21,8 +21,41 @@ offline (Service Worker, unabhängig)
 
 Abhängigkeiten zeigen nur nach innen (`domain` kennt niemanden).
 
-## 2. Datenmodell
-Siehe Spezifikation Kap. 16. Barcodes immer als `string`. Das Dexie-Schema (Meilenstein 3) wird hier mit Versionsstand dokumentiert.
+## 2. Datenmodell und Persistenz (`src/domain/types.ts`, `src/adapters/persistence/db.ts`)
+Siehe Spezifikation Kap. 16. Barcodes immer als `string`; `syntaxStatus`, `checksumStatus` und `catalogStatus` sind getrennte Aussagen (kein gemeinsamer „grüner Haken“).
+
+**Dexie-Schema (Datenbank `barq-player`), aktuelle Version 1**
+
+| Tabelle | Primärschlüssel | Indizes | Inhalt |
+|---|---|---|---|
+| `collections` | `id` | `name`, `updatedAt` | Sammlungen |
+| `items` | `id` | `collectionId`, `[collectionId+position]`, `value` | Codes (Position 0-basiert, lückenlos) |
+| `templates` | `id` | `name` | Sequenzvorlagen |
+| `profiles` | `id` | – | Scannerprofile (Standardprofile werden beim ersten `listProfiles()` angelegt) |
+| `catalog` | `value` | – | Artikelstamm (Kennung, aktiv, Quelle, Importdatum) |
+| `sessions` | `id` | `collectionId`, `startedAt` | Sitzungskopf inkl. App-Version |
+| `events` | `id` | `sessionId`, `timestamp` | Wiedergabeereignisse |
+
+**Versionierung:** Schemaänderungen nur als neuer `this.version(n).stores(...)`-Block (mit `upgrade`-Funktion bei Datenumbau) – bestehende Blöcke werden nie geändert. Vor riskanten Migrationen soll die UI ein JSON-Backup anbieten (Spezifikation 19.4). Das Backup-Format hat eine eigene `schemaVersion` (aktuell 1); neuere Dateien werden abgelehnt, ältere über eine künftige Migrationsfunktion in `backup-schema.ts` gehoben.
+
+**Schreibzugriffe:** immer über `guardWrite`/`mapStorageError` (`QuotaExceededError` → `ERR_STORAGE_QUOTA_EXCEEDED`, sonst `ERR_STORAGE_WRITE_FAILED`). Mehrtabellen-Schreibvorgänge laufen in einer Dexie-Transaktion (alles oder nichts). Die UI bestätigt „gespeichert“ erst nach erfolgreichem Rückgabewert des Service-Aufrufs.
+
+**Persistenz:** `requestPersistentStorage()` ruft `navigator.storage.persisted()/persist()/estimate()` auf und liefert `{supported, persisted, usageBytes, quotaBytes, error}`; sie wirft nie. Persistenter Speicher ersetzt kein Backup.
+
+## 2a. Services (`src/application/`)
+- `CollectionService`: Sammlungen (Name 1–100 Zeichen), Einträge (`addItem(s)` validiert mit `validateCodeValue`; ungültige Werte werden abgelehnt, nie korrigiert; `addItems` ist atomar), Duplikatregel `merge` (Menge erhöhen, Standard) oder `append`, Menge 1–9999, Verschieben/Entfernen mit lückenloser Neunummerierung, Artikelstamm-Abgleich (`known`/`inactive`/`unknown` mit `catalogSource` und `catalogCheckedAt`; ohne Stamm bleibt `unchecked`), Vorlagen, Profile.
+- `BackupService`: JSON-Voll-Export/-Import, CSV-Export/-Import einer Sammlung, Artikelstamm-CSV.
+- `SessionService`: Sitzungskopf und Ereignisse (idempotent über Ereignis-ID).
+
+## 2b. Backup-Format (`src/domain/backup-schema.ts`)
+`{ format: "barq-player-backup", schemaVersion, exportedAt, appVersion, data: { collections, items, templates, profiles, catalog, sessions, events } }`. `validateBackup` prüft die komplette Datei **vor** dem ersten Schreibzugriff: Struktur, Typen, Aufzählungen, `quantity`/`position` als ganze Zahlen, `value` als String (nie Zahl), eindeutige IDs, Verweise Eintrag→Sammlung und Ereignis→Sitzung, eindeutige Positionen je Sammlung; unbekannte Zusatzfelder werden verworfen, Probleme mit Pfad (`data.items[3].quantity`) gemeldet (max. 50). Import = Replace-All in einer Transaktion; ein Fehler mittendrin rollt alles zurück.
+
+## 2c. CSV (`src/domain/csv.ts`, `csv-items.ts`)
+- RFC-4180-Parser (Anführungszeichen, Zeilenumbrüche in Feldern, BOM, CRLF/LF/CR), Trennzeichen `,` `;` Tab automatisch erkannt, alle Zellen bleiben Strings. Offene Anführungszeichen u. Ä. → `ERR_IMPORT_CSV_INVALID` mit Zeilennummer.
+- **Formelschutz:** Beim Export erhält jede Zelle, die mit `=`, `+`, `-`, `@`, Tab oder CR beginnt (auch nach führenden `'`), ein vorangestelltes `'`; beim Import wird genau dieses eine `'` wieder entfernt (verlustfreier Round-Trip, getestet).
+- **Führende Nullen:** Werte werden nie in Zahlen umgewandelt. Hat ein Tabellenprogramm Nullen entfernt, meldet der Import einen Längenfehler samt Hinweis – es wird nicht „repariert“.
+- Export-Spalten: `collection, position (ab 1), symbology, value, quantity, label, source, syntaxStatus, checksumStatus, catalogStatus`. Import: Spaltenzuordnung per Kopfzeile (deutsch/englisch) oder manuell; Standardsymbologie für Dateien ohne Symbologie-Spalte; `abort` (Standard, nichts importieren) oder `skip-invalid`; Fehlerbericht pro Zeile.
+- Artikelstamm-CSV: Kennung (`EAN`/`GTIN`/`Code`/…), optional `Aktiv` (ja/nein/1/0/…) und `Bezeichnung`; doppelte Kennungen sind Fehler.
 
 ## 3. Zustandsautomat (`src/domain/playback-machine.ts`)
 
@@ -111,6 +144,9 @@ Spezifikations-ADRs 01–05 gelten unverändert (Kap. 26). Ergänzungen:
 ### ADR-06: Eigene `vitest.config.ts`
 Entscheidung: Test-Konfiguration getrennt von `vite.config.ts`. Grund: Das PWA-Plugin wird im Testlauf nicht gebraucht; saubere Trennung.
 
+### ADR-07: Toolchain-Versionen
+Entscheidung: Aktuelle Releases (TypeScript 7, Vite 8, Vitest 5) wie von `npm install` aufgelöst; Versionen sind durch `package-lock.json` fixiert. `@types/node` nur für Tests (`types: ["node"]`); `src/domain/` bleibt frei von Node-/Browser-APIs.
+
 ### ADR-08: Sequenzende außerhalb des Schrittrasters
 Entscheidung: Liegt `end` nicht auf dem Raster, endet die Reihe beim letzten Rasterwert ≤ `end` und die Vorschau zeigt eine **Warnung** (kein Fehler). Grund: Spezifikation 21 („Ende wird nur erreicht, wenn es auf dem Schrittraster liegt“); sichtbar statt still.
 
@@ -132,5 +168,20 @@ Entscheidung: Auch im manuellen Modus wird das Symbol nach `displayMs` ausgeblen
 ### ADR-14: Interleaver sortiert nur bei Bedarf
 Entscheidung: Ohne identische Nachbarn bleibt die Reihenfolge unverändert. Grund: Die Reihenfolge der Sammlung soll nicht ohne Not verändert werden.
 
-### ADR-07: Toolchain-Versionen
-Entscheidung: Aktuelle Releases (TypeScript 7, Vite 8, Vitest 5) wie von `npm install` aufgelöst; Versionen sind durch `package-lock.json` fixiert. `@types/node` nur für Tests (`types: ["node"]`); `src/domain/` bleibt frei von Node-/Browser-APIs.
+### ADR-15: Duplikate beim Erfassen standardmäßig zusammenführen
+Entscheidung: `addItem` erhöht bei gleicher Symbologie und gleichem Wert die Menge (`merge`); `append` bleibt wählbar. Grund: Spezifikation 10.2 („Alternativ Menge direkt ändern“, keine globale Duplikatsperre); das technische Duplikat im Videostream behandelt der Capture-Service (M5) getrennt.
+
+### ADR-16: Backup-Import ist Replace-All, atomar und vorvalidiert
+Entscheidung: Kein Merge-Import. Eine ungültige Datei berührt die Datenbank nie. Grund: Spezifikation 20 („Import vor dem Überschreiben vollständig validieren“); ein Merge würde ID-Konflikte und Teilzustände erzeugen.
+
+### ADR-17: CSV-Formelschutz per Apostroph mit Rückbau beim Import
+Entscheidung: Schutz nach OWASP-Muster, aber reversibel (`'`-Präfix wird beim Import genau einmal entfernt). Grund: Verlustfreier Round-Trip bei gleichzeitigem Schutz vor Formeln in Excel/Calc.
+
+### ADR-18: Positionen 0-basiert, lückenlos
+Entscheidung: `BarcodeItem.position` ist 0-basiert und wird nach Entfernen/Verschieben neu nummeriert; die UI zeigt `position + 1`. Grund: einfache Indexierung der Ausgabeliste und eindeutiger Index `[collectionId+position]`.
+
+### ADR-19: Artikelstamm-Abgleich nur über die Kennung
+Entscheidung: Treffer wird über den Wert (String) ermittelt, nicht über die Symbologie. Grund: Der Stamm enthält Kennungen (GTIN/Artikelnummer); die Aussage gilt nur für den importierten Stand (Spezifikation 12.4).
+
+### ADR-20: Test-Setup mit `fake-indexeddb` global
+Entscheidung: `tests/setup.ts` lädt `fake-indexeddb/auto` für alle Tests (vor Dexie). Grund: ES-Importreihenfolge – Dexie liest `indexedDB` beim Laden des Moduls.

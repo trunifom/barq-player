@@ -38,4 +38,12 @@ Pro Zeile ein Code. Fehlerhafte Zeilen werden mit Zeilennummer gemeldet (z. B. �
 - „Bestätigt“ heißt: **Sie** haben an der Kasse nachgesehen – nicht, dass die Kasse es gemeldet hat.
 - **Identische Artikel nacheinander** liest mancher Scanner nur verzögert. Der Schalter „Smart-Interleaving“ mischt die Reihenfolge so, dass gleiche Codes möglichst nicht direkt aufeinander folgen.
 
+## Vorab: Sicherung (Backup) und Austausch (Bedienung folgt in Meilenstein 6)
+
+- **JSON-Backup** enthält alles (Sammlungen, Vorlagen, Profile, Artikelstamm, Sitzungsprotokolle). Erstellen Sie regelmäßig eine Sicherung – der Browser-Speicher kann gelöscht werden, auch wenn die App „persistenten Speicher“ erhält.
+- **Wiederherstellen** ersetzt alle aktuellen Daten. Die Datei wird zuerst vollständig geprüft; ist sie fehlerhaft, bleiben Ihre Daten unverändert. Die Fehlermeldung nennt die betroffene Stelle (z. B. `data.items[3].quantity`).
+- **CSV-Export/-Import** eignet sich für den Austausch mit Tabellen. Wichtig: Öffnen Sie CSV-Dateien nicht einfach per Doppelklick in Excel – führende Nullen gehen sonst verloren. Importieren Sie die Spalte „value“ als **Text**. Verlorene Nullen werden beim Import als Fehler gemeldet, nicht still ergänzt.
+- Werte, die mit `=`, `+`, `-` oder `@` beginnen, werden im Export mit einem vorangestellten `'` geschützt, damit Tabellenprogramme sie nicht als Formel ausführen; beim Import der App wird das `'` wieder entfernt.
+- **Artikelstamm-CSV** (Spalten z. B. `EAN`, `Aktiv`, `Bezeichnung`): Danach zeigt die App je Code „bekannt / inaktiv / unbekannt“ – bezogen auf den **importierten Stand** und dessen Datum, nicht auf den aktuellen Zustand Ihrer Kasse.
+
 **Wichtig vorab:** BarQPlayer zeigt Codes an. „Angezeigt“ bedeutet nie „an der Kasse gebucht“.

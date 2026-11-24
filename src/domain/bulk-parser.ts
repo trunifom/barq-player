@@ -78,11 +78,12 @@ function utf8Length(text: string): number {
   return bytes;
 }
 
-type LineOutcome =
+/** Ergebnis der Validierung eines einzelnen Code-Werts. */
+export type CodeValidation =
   | { ok: true; value: string; syntax: SyntaxStatus; checksum: ChecksumStatus }
   | { ok: false; code: ErrorCode; message: string };
 
-function parseGtinLine(raw: string, symbology: GtinSymbology): LineOutcome {
+function parseGtinLine(raw: string, symbology: GtinSymbology): CodeValidation {
   const value = raw.replace(/[ \t]/g, '');
   const result = validateGtin(value, symbology);
   if (result.syntax === 'valid' && result.checksum === 'valid') {
@@ -96,7 +97,7 @@ function parseGtinLine(raw: string, symbology: GtinSymbology): LineOutcome {
   };
 }
 
-function parseCode128Line(raw: string): LineOutcome {
+function parseCode128Line(raw: string): CodeValidation {
   const value = raw.trim();
   if (value.length > MAX_CODE128_LENGTH) {
     return { ok: false, code: 'ERR_SYNTAX_INVALID', message: `Code 128 erlaubt höchstens ${MAX_CODE128_LENGTH} Zeichen (erhalten: ${value.length}).` };
@@ -107,7 +108,7 @@ function parseCode128Line(raw: string): LineOutcome {
   return { ok: true, value, syntax: 'valid', checksum: 'not-applicable' };
 }
 
-function parseQrLine(raw: string): LineOutcome {
+function parseQrLine(raw: string): CodeValidation {
   // eslint-disable-next-line no-control-regex
   if (/[\u0000-\u0008\u000a-\u001f\u007f]/.test(raw)) {
     return { ok: false, code: 'ERR_SYNTAX_INVALID', message: 'Der QR-Text enthält Steuerzeichen.' };
@@ -117,6 +118,19 @@ function parseQrLine(raw: string): LineOutcome {
     return { ok: false, code: 'ERR_SYNTAX_INVALID', message: `Der QR-Text ist zu lang (${bytes} Bytes, erlaubt ${MAX_QR_BYTES}).` };
   }
   return { ok: true, value: raw, syntax: 'valid', checksum: 'not-applicable' };
+}
+
+/**
+ * Validiert und normalisiert EINEN Code-Wert nach den Regeln seiner Symbologie (siehe Dateikopf).
+ * @param raw - Rohwert (eine Zeile).
+ * @param symbology - erwartete Symbologie.
+ * @returns normalisierter Wert samt Status oder zeilentauglicher Fehler (nie eine stille Korrektur).
+ */
+export function validateCodeValue(raw: string, symbology: Symbology): CodeValidation {
+  if (raw.trim() === '') return { ok: false, code: 'ERR_SYNTAX_INVALID', message: 'Der Wert ist leer.' };
+  if (symbology === 'EAN13' || symbology === 'EAN8' || symbology === 'UPCA') return parseGtinLine(raw, symbology);
+  if (symbology === 'Code128') return parseCode128Line(raw);
+  return parseQrLine(raw);
 }
 
 /**
@@ -151,10 +165,7 @@ export function parseBulkInput(text: string, options: BulkParseOptions): BulkPar
       skippedEmptyLines++;
       return;
     }
-    let outcome: LineOutcome;
-    if (symbology === 'EAN13' || symbology === 'EAN8' || symbology === 'UPCA') outcome = parseGtinLine(raw, symbology);
-    else if (symbology === 'Code128') outcome = parseCode128Line(raw);
-    else outcome = parseQrLine(raw);
+    const outcome = validateCodeValue(raw, symbology);
 
     if (!outcome.ok) {
       errors.push({ line, raw, code: outcome.code, message: `Zeile ${line}: ${outcome.message}` });
