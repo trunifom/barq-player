@@ -7,7 +7,8 @@ Offline-first Android-PWA zum Scannen, Erzeugen (EAN-13, EAN-8, QR-Code, Code 12
 - ✅ M1 Fachkern 1: Fehler-Framework, Domain-Typen, GS1-Prüfziffern, Sequenz-Engine (`2 063701 028{XX}{C}`, Schritt `+12`), Bulk-Parser
 - ✅ M2 Fachkern 2: Smart-Interleaver, deterministische Fader-Zustandsmaschine (Blank-on-Pause/Error/Background, Generation-IDs, Unsicherheitsbereich)
 - ✅ M3 Persistenz: Dexie-Schema v1, Sammlungs-/Artikelstamm-Service, JSON-Backup mit atomarem Restore, CSV-Austausch mit Formelschutz
-- ⏳ M4–M7: Renderer, Kamera/Decoder, UI, Offline-Härtung
+- ✅ M4 Renderer: bwip-js-Modulmuster → eigenes SVG (`#000`/`#FFF`, `crispEdges`, ganzzahlige Pixel pro Modul, Ruhezonen, 90°-Drehung, Lookahead-Cache), per zxing-wasm rückgelesen
+- ⏳ M5–M7: Kamera/Decoder, UI, Offline-Härtung
 
 Detailstand: [`docs/PFLICHTENHEFT_STATUS.md`](docs/PFLICHTENHEFT_STATUS.md).
 

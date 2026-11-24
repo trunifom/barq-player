@@ -125,8 +125,35 @@ Wert = `prefix + pad(feld, variableWidth) + suffixBeforeCheckDigit` (+ GS1-Prüf
 ## 4c. Bulk-Parser (`src/domain/bulk-parser.ts`)
 Eine Zeile = ein Code, explizite Symbologie, zeilengenaue deutsche Fehler (`Zeile 7: …`), ungültige Zeilen erscheinen nie in den Ergebnissen. Normalisierung: BOM weg; EAN/UPC: Leerzeichen/Tabs entfernen; Code 128: Zeilenränder trimmen, ASCII 0x20–0x7E, ≤ 80 Zeichen; QR: Text unverändert, keine Steuerzeichen (außer Tab), ≤ 2000 UTF-8-Bytes. Grenze 10 000 Zeilen (`ERR_BULK_INPUT_INVALID`). Duplikate: `keep` (Standard) oder `merge` (zu Menge).
 
-## 5. Rendering-Mathematik
-Wird in Meilenstein 4 dokumentiert (Ruhezonen EAN-13 11X/7X, EAN-8 7X/7X, Code 128 10X/10X, QR 4X; ganzzahlige Pixel pro Modul).
+## 5. Rendering (`src/domain/render-layout.ts`, `src/adapters/renderer/barcode-renderer.ts`)
+
+**Pipeline:** Wert validieren (`validateCodeValue`, wie beim Speichern) → bwip-js `raw()` liefert nur das Modulmuster (1D: abwechselnde Balken-/Lückenbreiten, beginnend mit Balken; QR: Matrix) → eigenes SVG aus ganzzahligen Modulkoordinaten. bwip-js zeichnet nichts; so sind Farben, Ruhezonen und Skalierung vollständig unter eigener Kontrolle und im Test prüfbar.
+
+**Ruhezonen (Module „X“)**
+
+| Symbologie | links | rechts | oben/unten |
+|---|---|---|---|
+| EAN-13 | 11 | 7 | 4 |
+| EAN-8 | 7 | 7 | 4 |
+| UPC-A | 9 | 9 | 4 |
+| Code 128 | 10 | 10 | 4 |
+| QR | 4 | 4 | 4 |
+
+Balkenhöhe (Module, ohne Klartext): EAN-13/UPC-A 69, EAN-8 65, Code 128 50.
+
+**Skalierung:** `modulePx = floor(min(Viewport.width·dpr / modulesWide, Viewport.height·dpr / modulesHigh))` in **Gerätepixeln** (mindestens 1). Das SVG hat `viewBox="0 0 W H"` in Modulen und `width/height = modules·modulePx / dpr` (CSS-Pixel, so dass Gerätepixel ganzzahlig bleiben). Passt das Symbol selbst mit 1 Gerätepixel/Modul nicht, setzt der Renderer `fits=false` – es wird nie gestaucht oder abgeschnitten; der Player muss das als Fehler behandeln.
+
+**Drehung:** `recommendRotation` empfiehlt 90° nur für 1D-Codes, wenn ungedreht `< 3` Gerätepixel/Modul möglich wären **und** die Drehung ein größeres Modulmaß erlaubt. Die Geometrie wird gedreht ((x,y,w,h) → (H−y−h, x, h, w)); es gibt kein `transform`. QR wird nie gedreht.
+
+**Farben/Effekte:** nur `#000000` auf `#FFFFFF`, `shape-rendering="crispEdges"`, `style="forced-color-adjust:none;color-scheme:light only"` gegen Dark-Mode-/Kontrast-Umkehr; keine Opacity, Filter, Strokes oder Transformationen (per Test abgesichert).
+
+**QR:** Fehlerkorrektur `L/M/Q/H`, Standard `M`; zu langer Inhalt für die Stufe → `ERR_RENDER_FAILED` (nie stilles Kürzen). Text wird als Daten behandelt, nie ausgeführt.
+
+**Lookahead-Cache (`RenderCache`):** LRU mit höchstens 3 Einträgen (aktuell + `MAX_LOOKAHEAD = 2`); `prefetch` bereitet höchstens 2 Folgesymbole vor und liefert Fehler als Liste zurück, statt sie zu verschlucken oder zu werfen. Das aktuelle Symbol rendert immer über `get` und wirft Fehler weiter.
+
+**Verifikation:** Die Tests vergleichen die Modulzeile mit unabhängigen GS1-Referenz-Encodern (EAN-13/EAN-8/UPC-A), prüfen Start-/Stoppmuster bei Code 128 und rastern jedes Symbol zurück, um es mit `zxing-wasm` (lokales WASM) zu dekodieren (EAN, Code 128, QR in allen ECC-Stufen, Unicode, gedrehter Code 128).
+
+**Hinweise für den Decoder-Adapter (M5):** zxing liefert UPC-A mit Formatnamen `UPCA` und als 13-stelligen Text mit führender `0`; diese Normalisierung muss dort explizit und dokumentiert erfolgen.
 
 ## 6. Offline-/WASM-Strategie
 - `zxing-wasm` lädt `./wasm/zxing_reader.wasm` über `locateFile`; kein CDN zur Laufzeit.
@@ -185,3 +212,15 @@ Entscheidung: Treffer wird über den Wert (String) ermittelt, nicht über die Sy
 
 ### ADR-20: Test-Setup mit `fake-indexeddb` global
 Entscheidung: `tests/setup.ts` lädt `fake-indexeddb/auto` für alle Tests (vor Dexie). Grund: ES-Importreihenfolge – Dexie liest `indexedDB` beim Laden des Moduls.
+
+### ADR-21: Vertikaler Rand bei 1D-Codes = 4 Module
+Entscheidung: Oben und unten wird bei Strichcodes ein weißer Rand von 4 Modulen gelassen. Grund: Die Spezifikation legt nur die horizontalen Ruhezonen fest; der Rand verhindert, dass Rahmen oder Bildschirmkante die Balken berühren.
+
+### ADR-22: Drehung nur bei Bedarf (Schwelle 3 Gerätepixel pro Modul)
+Entscheidung: Breite 1D-Codes werden nur gedreht, wenn sie ungedreht kleiner als 3 Gerätepixel/Modul wären und die Drehung das Modulmaß vergrößert. Grund: AGENTS.md verlangt automatische Drehung bei breiten Codes; ein größeres Modulmaß ist nur dann nötig, wenn ungedreht kaum lesbar. Der Schwellenwert ist ein Startwert und per `minModulePx` einstellbar (an echter Hardware zu kalibrieren).
+
+### ADR-23: Eigenes SVG statt `bwipjs.toSVG`
+Entscheidung: Nur `bwipjs.raw()` nutzen, SVG selbst erzeugen. Grund: Volle Kontrolle über ganzzahlige Koordinaten, Farben und Ruhezonen; testbar gegen unabhängige Referenz-Encoder.
+
+### ADR-24: Kein Klartext unter dem Symbol
+Entscheidung: Keine lesbaren Ziffern im Symbolbereich. Grund: Spezifikation 18 („Keine Bedienelemente über dem Symbol“); Scanner brauchen sie nicht, zusätzliche Elemente verkleinern nur die nutzbare Fläche.

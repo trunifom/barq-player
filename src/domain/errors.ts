@@ -25,6 +25,7 @@ export type ErrorCode =
   | 'ERR_IMPORT_SCHEMA_INVALID'
   | 'ERR_IMPORT_CSV_INVALID'
   | 'ERR_NOT_FOUND'
+  | 'ERR_RENDER_FAILED'
   | 'ERR_PLAYBACK_FAILED'
   | 'ERR_UNKNOWN';
 
@@ -99,6 +100,10 @@ export const ERROR_CATALOG: Readonly<Record<ErrorCode, ErrorCatalogEntry>> = {
   ERR_NOT_FOUND: {
     userMessage: 'Der gesuchte Eintrag existiert nicht (mehr).',
     recoveryHint: 'Liste neu laden und die Aktion wiederholen.'
+  },
+  ERR_RENDER_FAILED: {
+    userMessage: 'Der Code konnte nicht dargestellt werden.',
+    recoveryHint: 'Wert, Format und Fehlerkorrektur prüfen; bei langen Texten Fehlerkorrektur senken.'
   },
   ERR_PLAYBACK_FAILED: {
     userMessage: 'Bei der Wiedergabe ist ein Fehler aufgetreten. Das Symbol wurde ausgeblendet.',

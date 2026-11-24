@@ -46,4 +46,11 @@ Pro Zeile ein Code. Fehlerhafte Zeilen werden mit Zeilennummer gemeldet (z. B. �
 - Werte, die mit `=`, `+`, `-` oder `@` beginnen, werden im Export mit einem vorangestellten `'` geschützt, damit Tabellenprogramme sie nicht als Formel ausführen; beim Import der App wird das `'` wieder entfernt.
 - **Artikelstamm-CSV** (Spalten z. B. `EAN`, `Aktiv`, `Bezeichnung`): Danach zeigt die App je Code „bekannt / inaktiv / unbekannt“ – bezogen auf den **importierten Stand** und dessen Datum, nicht auf den aktuellen Zustand Ihrer Kasse.
 
+## Vorab: So werden Codes angezeigt (Generator/Fader, Bedienung folgt in Meilenstein 6)
+
+- Codes erscheinen immer **schwarz auf weiß**, auch im Dunkelmodus des Telefons, mit dem vorgeschriebenen weißen Rand rundherum. Bitte keine Hüllen oder Schutzfolien mit Spiegelung verwenden und die Bildschirmhelligkeit hoch einstellen.
+- Die Größe wird immer in **ganzen Bildschirmpunkten pro Strich** berechnet, damit die Striche scharf bleiben. Passt ein Code nicht auf den Bildschirm, meldet die App das – sie quetscht ihn nicht.
+- **Lange Strichcodes** (z. B. Code 128 mit vielen Zeichen) werden bei Bedarf automatisch **um 90° gedreht**, damit sie größer dargestellt werden können. Halten Sie das Telefon dann entsprechend zum Scanner.
+- QR-Codes enthalten reinen Text. Die App öffnet nie Links und führt nie etwas aus.
+
 **Wichtig vorab:** BarQPlayer zeigt Codes an. „Angezeigt“ bedeutet nie „an der Kasse gebucht“.
