@@ -4,6 +4,10 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig({
   // Relative Pfade: die App läuft auch unter Unterpfaden (z. B. GitHub Pages) und der Decoder findet ./wasm/ lokal.
   base: './',
+  build: {
+    // Offline-first: alles wird vorab gecacht, ein einziges Bundle (bwip-js ist gross) ist bewusst gewollt (ADR-33).
+    chunkSizeWarningLimit: 1500
+  },
   plugins: [
     VitePWA({
       registerType: 'prompt',

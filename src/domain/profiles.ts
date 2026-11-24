@@ -13,6 +13,9 @@ export const DEFAULT_PROFILES: readonly FaderProfile[] = Object.freeze([
   { id: 'profile-identical', name: 'Identische Codes', displayMs: 500, blankMs: 150, identicalBlankMs: 800, startDelayMs: 3000, notes: 'Wiederholsperre des Scanners kalibrieren' }
 ].map((p) => Object.freeze(p)));
 
+/** Mindest-Leerzeit in ms: mindestens ein Bildschirmbild (60 Hz ≈ 16,7 ms), damit zwischen zwei Symbolen sicher ein leerer Frame liegt. */
+export const MIN_BLANK_MS = 20;
+
 /**
  * Prüft ein Profil auf sinnvolle Werte.
  * @param profile - zu prüfendes Profil.
@@ -30,8 +33,8 @@ export function validateProfile(profile: FaderProfile): string[] {
     }
   };
   num(profile.displayMs, 'Die Anzeigezeit', 0, true);
-  num(profile.blankMs, 'Die Leerzeit', 0, false);
-  num(profile.identicalBlankMs, 'Die Leerzeit für identische Codes', 0, false);
+  num(profile.blankMs, 'Die Leerzeit', MIN_BLANK_MS, false);
+  num(profile.identicalBlankMs, 'Die Leerzeit für identische Codes', MIN_BLANK_MS, false);
   num(profile.startDelayMs, 'Die Startverzögerung', 0, false);
   return problems;
 }

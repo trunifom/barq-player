@@ -1,30 +1,670 @@
+/* BarQPlayer – Mobile-first, einhändig bedienbar (Navigation unten, große Bedienflächen ≥ 48 px).
+   Pflichtregeln: Barcode/QR nie invertieren, keine Animationen im Fader, Symbolbereich ohne Bedienelemente. */
+
 :root {
   color-scheme: light;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --bg: #f3f4f6;
+  --surface: #ffffff;
+  --text: #111827;
+  --muted: #4b5563;
+  --border: #d1d5db;
+  --primary: #1d4ed8;
+  --primary-text: #ffffff;
+  --danger: #b91c1c;
+  --ok: #166534;
+  --warn: #92400e;
+  --bar: #111827;
+  --nav-h: 64px;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  line-height: 1.45;
 }
 
 * {
   box-sizing: border-box;
 }
 
+html,
 body {
   margin: 0;
-  background: #ffffff;
-  color: #111827;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-text-size-adjust: 100%;
 }
 
-.container {
-  max-width: 720px;
+#app {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ------------------------------------------------------------------ Shell */
+.app__header {
+  background: var(--bar);
+  color: #fff;
+  padding: calc(env(safe-area-inset-top, 0px) + 0.5rem) 1rem 0.5rem;
+  font-weight: 700;
+}
+
+.app__main {
+  flex: 1;
+  padding: 1rem 1rem calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 1.5rem);
+  max-width: 760px;
+  width: 100%;
   margin: 0 auto;
-  padding: 1.5rem;
+  outline: none;
 }
 
-/* Pflichtregel fuer Barcode- & QR-Darstellung: niemals invertieren, scharfe Kanten */
+.app__nav {
+  position: fixed;
+  inset: auto 0 0 0;
+  height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: var(--bar);
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  z-index: 10;
+}
+
+.app__nav-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  color: #d1d5db;
+  text-decoration: none;
+  font-size: 0.78rem;
+  padding: 0.25rem;
+  min-height: 48px;
+}
+
+.app__nav-link[aria-current='page'] {
+  color: #fff;
+  font-weight: 700;
+  box-shadow: inset 0 3px 0 #60a5fa;
+}
+
+body.is-playing .app__nav,
+body.is-playing .app__header {
+  display: none;
+}
+
+body.is-playing .app__main {
+  padding: 0;
+  max-width: none;
+}
+
+.screen h1 {
+  font-size: 1.4rem;
+  margin: 0.25rem 0 1rem;
+}
+
+.screen h2 {
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+}
+
+/* ------------------------------------------------------------------ Bausteine */
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 0.9rem;
+  margin: 0 0 1rem;
+}
+
+details.card > summary {
+  font-weight: 700;
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0 0 0.8rem;
+}
+
+.field--check,
+.check {
+  flex-direction: row;
+  align-items: center;
+  display: flex;
+  gap: 0.6rem;
+  min-height: 44px;
+}
+
+.field label,
+.fieldset legend {
+  font-weight: 600;
+}
+
+.field__error {
+  color: var(--danger);
+  font-weight: 600;
+  margin: 0.25rem 0;
+}
+
+.hint {
+  color: var(--muted);
+  margin: 0.25rem 0;
+  font-size: 0.92rem;
+}
+
+.input,
+select,
+textarea,
+input[type='file'] {
+  font: inherit;
+  min-height: 48px;
+  padding: 0.5rem 0.7rem;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  width: 100%;
+}
+
+.input--small {
+  width: 7rem;
+}
+
+.textarea {
+  min-height: 9rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+input[type='checkbox'] {
+  width: 24px;
+  height: 24px;
+  flex: none;
+}
+
+.btn {
+  font: inherit;
+  font-weight: 600;
+  min-height: 48px;
+  min-width: 48px;
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+  border: 2px solid var(--border);
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn--primary {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: var(--primary-text);
+}
+
+.btn--danger {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.btn--stop {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.btn--big {
+  min-height: 64px;
+  font-size: 1.15rem;
+  width: 100%;
+}
+
+.btn--icon {
+  padding: 0.25rem;
+}
+
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0.5rem 0;
+  font: inherit;
+  color: var(--primary);
+  text-align: left;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0;
+}
+
+.btn-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.inline {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.inline > select,
+.inline > input:not([type='checkbox']) {
+  flex: 1;
+  min-width: 8rem;
+}
+
+.grid2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 0.75rem;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.toolbar h2 {
+  flex: 1;
+  margin: 0;
+}
+
+.plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.notice-inline {
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  font-weight: 600;
+}
+
+:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 2px;
+}
+
+/* ------------------------------------------------------------------ Badges, Tabellen, Listen */
+.badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 0.1rem 0.6rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border: 1px solid currentColor;
+  background: #fff;
+}
+
+.badge--ok {
+  color: var(--ok);
+}
+.badge--warn {
+  color: var(--warn);
+}
+.badge--bad {
+  color: var(--danger);
+}
+.badge--neutral {
+  color: var(--muted);
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  font-size: 0.92rem;
+}
+
+.table th,
+.table td {
+  border-bottom: 1px solid var(--border);
+  padding: 0.4rem;
+  text-align: left;
+  vertical-align: top;
+}
+
+.table .num {
+  text-align: right;
+}
+
+.qty,
+.actions {
+  white-space: nowrap;
+}
+
+.qty__value {
+  display: inline-block;
+  min-width: 2rem;
+  text-align: center;
+  font-weight: 700;
+}
+
+.value,
+code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  word-break: break-all;
+}
+
+.collection-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.recent {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.recent__item {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.errors,
+.issues {
+  margin: 0.4rem 0;
+  padding-left: 1.2rem;
+}
+
+.log {
+  font-size: 0.8rem;
+  padding-left: 1.2rem;
+}
+
+.log__error {
+  color: var(--danger);
+}
+
+/* ------------------------------------------------------------------ Meldungen */
+.toasts {
+  position: fixed;
+  left: 0.5rem;
+  right: 0.5rem;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 0.5rem);
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  pointer-events: none;
+}
+
+.notice {
+  pointer-events: auto;
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  background: #1f2937;
+  color: #fff;
+  border-radius: 10px;
+  padding: 0.6rem 0.8rem;
+  border-left: 6px solid #60a5fa;
+}
+
+.notice--success {
+  border-left-color: #22c55e;
+}
+
+.notice--error {
+  background: #7f1d1d;
+  border-left-color: #fca5a5;
+}
+
+.notice__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.notice__hint {
+  font-size: 0.9rem;
+}
+
+.notice__code {
+  font-size: 0.75rem;
+  opacity: 0.8;
+}
+
+.notice__close {
+  background: none;
+  border: 0;
+  color: inherit;
+  font-size: 1.4rem;
+  min-width: 44px;
+  min-height: 44px;
+  cursor: pointer;
+}
+
+/* ------------------------------------------------------------------ Dialog */
+.dialog-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 100;
+}
+
+.dialog {
+  background: #fff;
+  color: var(--text);
+  border-radius: 14px;
+  padding: 1.1rem;
+  width: min(32rem, 100%);
+  max-height: 90dvh;
+  overflow: auto;
+}
+
+.dialog__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1rem;
+}
+
+/* ------------------------------------------------------------------ Kamera */
+.camera {
+  position: relative;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  margin: 0.5rem 0;
+}
+
+.camera__video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.camera__reticle {
+  position: absolute;
+  inset: 20% 10%;
+  border: 3px solid rgba(255, 255, 255, 0.85);
+  border-radius: 12px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+/* ------------------------------------------------------------------ Vorschau und Fader */
+/* Pflichtregel: Barcode/QR immer #000 auf #FFF, nie invertieren, scharfe Kanten. */
 .barcode-stage {
   background: #ffffff !important;
   color: #000000 !important;
+  color-scheme: light only;
+  forced-color-adjust: none;
 }
 
 .barcode-stage svg {
   shape-rendering: crispEdges;
+  display: block;
+  max-width: none;
+}
+
+.preview {
+  min-height: 3rem;
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  margin: 0.5rem 0;
+  padding: 0.25rem;
+}
+
+.player {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  z-index: 60;
+}
+
+/* Keine Überblendungen oder Animationen im Fader (harter Wechsel mit leerem Zustand). */
+.player,
+.player * {
+  transition: none !important;
+  animation: none !important;
+  scroll-behavior: auto !important;
+}
+
+.stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.player__bar {
+  flex: none;
+  min-height: var(--bar-h, 176px);
+  max-height: 75dvh;
+  overflow: auto;
+  background: var(--bar);
+  color: #fff;
+  padding: 0.75rem 0.9rem calc(env(safe-area-inset-bottom, 0px) + 0.75rem);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.player[data-state='PAUSED'] .player__bar,
+.player[data-state='ERROR'] .player__bar,
+.player[data-state='FINISHED'] .player__bar {
+  position: absolute;
+  inset: 0;
+  max-height: none;
+  background: #111827;
+}
+
+.player__status {
+  margin: 0;
+  font-size: 1.05rem;
+  font-weight: 600;
+}
+
+.player__status--alert {
+  color: #fecaca;
+}
+
+.player__bar .btn {
+  color: #fff;
+  border-color: #6b7280;
+  background: #1f2937;
+}
+
+.player__bar .btn--primary {
+  background: var(--primary);
+  border-color: var(--primary);
+}
+
+.player__bar .btn--stop {
+  background: #dc2626;
+  border-color: #dc2626;
+}
+
+.player__bar .btn--danger {
+  color: #fecaca;
+  border-color: #f87171;
+}
+
+.player__bar .input {
+  color: #111827;
+}
+
+.uncertain {
+  background: #1f2937;
+  border-radius: 10px;
+  padding: 0.7rem;
+}
+
+.uncertain p {
+  margin: 0.25rem 0;
+}
+
+.uncertain__range {
+  color: #fde68a;
+}
+
+.calibration,
+.finished {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.cal-result ul {
+  padding-left: 1.2rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
 }

@@ -1,68 +1,154 @@
 # Benutzerhandbuch – BarQPlayer
 
-> Stand: Meilenstein 0. Die App-Funktionen entstehen in den folgenden Meilensteinen; dieses Handbuch wird dabei Kapitel für Kapitel ausgefüllt.
+BarQPlayer erfasst Barcodes und QR-Codes im Lager, erzeugt Codes und Zahlenreihen und zeigt Codes an der Kasse einzeln nacheinander an, damit der Kassenscanner sie vom Telefondisplay liest.
 
-## Geplante Kapitel
+> **Das Wichtigste vorab:** BarQPlayer **zeigt Codes nur an**. „Angezeigt“ oder „bestätigt“ bedeutet **nie**, dass die Kasse einen Artikel gebucht hat. „Bestätigt“ heißt: *Sie* haben an der Kasse nachgesehen. Prüfen Sie die Kasse bei Unsicherheit immer selbst.
+
+> Stand: Meilenstein 6. Kapitel 1 und 2 (Installation, Offline-Betrieb) beschreiben das Zielverhalten; die Offline-Härtung (Service Worker, Update-Verhalten) wird in Meilenstein 7 abgeschlossen.
+
+## Inhalt
 1. PWA auf Android installieren
 2. Offline-Vorbereitung
-3. Scannen im Lager (Kamera & Foto-Import)
+3. Scannen im Lager
 4. Sammlungen pflegen
-5. Zahlenreihen & Präfix-Vorlagen (Beispiel `2 063701 028{XX}{C}`, Schritt `+12`)
-6. Kassen-Fader: Manuell, Automatik, Kleinstapel
-7. Verhalten bei Kassen-Fehlermeldungen
+5. Zahlenreihen und Präfix-Vorlagen
+6. Der Kassen-Fader
+7. Wenn die Kasse eine Fehlermeldung zeigt
 8. Kassen-Kalibrierung (20er-Test)
-9. JSON-Backup & CSV-Austausch
+9. Backup (JSON) und CSV-Austausch
 10. Fehlerbehebung
 
-## Vorab: Wie Zahlenreihen funktionieren (gilt ab der Oberfläche in Meilenstein 6)
+---
 
-Beispiel `2 063701 028{XX}{C}` mit Schritt `+12`:
+## 1. PWA auf Android installieren
+1. Öffnen Sie die Adresse der App in **Chrome** auf dem Android-Telefon (nur über **HTTPS** funktioniert die Kamera).
+2. Tippen Sie auf das Menü (⋮) → **„App installieren“** bzw. **„Zum Startbildschirm hinzufügen“**.
+3. Starten Sie BarQPlayer künftig über das Symbol auf dem Startbildschirm.
 
+Beim ersten Start fragt der Browser nach der **Kameraberechtigung** – bitte erlauben. Die App fragt außerdem **persistenten Speicher** an, damit der Browser Ihre Daten nicht automatisch löscht (Status unter *Einstellungen → Speicher*).
+
+## 2. Offline-Vorbereitung
+Die Codeerkennung und alle Funktionen laufen **auf dem Gerät**; es werden keine Daten ins Internet gesendet.
+1. Öffnen Sie die App **einmal mit Internetverbindung** und warten Sie, bis sie vollständig geladen ist.
+2. Prüfen Sie die Offline-Bereitschaft: Flugmodus einschalten, App schließen und neu öffnen, Kamera und Foto-Import testen.
+3. Erstellen Sie **vor wichtigen Einsätzen ein Backup** (Kapitel 9).
+
+## 3. Scannen im Lager (Bereich **Erfassen**)
+**Sammlung wählen:** Wählen Sie oben die Zielsammlung oder tippen Sie auf **Neu**.
+
+**Kamera**
+- **Kamera starten** (Rückkamera). Halten Sie den Code ruhig in den Rahmen. **Taschenlampe** und **Kamera wechseln** sind nur aktiv, wenn Ihr Gerät sie anbietet.
+- **Ein Code, ein Eintrag:** Bleibt ein Code dauerhaft im Bild, wird er **nur einmal** erfasst. Soll derselbe Artikel mehrfach zählen, nehmen Sie den Code etwa eine Sekunde aus dem Bild und halten ihn erneut davor – oder ändern Sie die Menge später mit **+**/**−**. Mit **„Nur eindeutige Codes erfassen“** werden Wiederholungen ignoriert.
+- **Ton und Vibration** bestätigen, dass der Code **tatsächlich gespeichert** wurde. Bei einem Speicherfehler hören Sie ein tiefes Doppelsignal und sehen eine Fehlermeldung; der Code ist dann **nicht** gespeichert.
+- **Freigegebene Formate:** EAN-13, EAN-8, QR-Code (Text), Code 128; UPC-A können Sie zuschalten. Erkennungen mit falscher Prüfziffer werden **verworfen**, nie korrigiert. Ein UPC-A-Strichcode wird standardmäßig als **EAN-13 mit führender 0** gespeichert (beide haben dieselben Striche).
+- Die Kamera stoppt automatisch, wenn Sie die App verlassen oder in den Hintergrund wechseln.
+
+**Foto-Import:** Wählen Sie ein oder mehrere Fotos. Pro Foto sehen Sie die erkannten Codes und wählen aus, welche übernommen werden. Bilder ohne Code oder nicht lesbare Bilder werden als solche gemeldet. Die Fotos selbst werden **nicht** gespeichert; der Dateiname dient als Bezeichnung.
+
+**Manuelle Eingabe und Liste:** Format wählen, Codes einfügen (**eine Zeile = ein Code**), **Prüfen**. Sie sehen „N gültig, M fehlerhaft“ und für jede fehlerhafte Zeile den Grund (z. B. „Zeile 3: Prüfziffer falsch (erwartet 1 …)“). Fehlerhafte Zeilen werden **nie automatisch korrigiert**. Mit **„Nur die N gültigen Zeilen speichern“** übernehmen Sie bewusst nur die gültigen.
+
+**QR-Codes** werden nur als Text gespeichert. Die App **öffnet nie Links** und führt nichts aus; Links, WLAN- und Kontaktdaten werden nur angezeigt, gefährliche Schemata (z. B. `javascript:`) mit Warnung.
+
+## 4. Sammlungen pflegen (Bereich **Sammlungen**)
+- **Neue Sammlung**, **Umbenennen**, **Löschen** (mit Rückfrage – vorher ein Backup erstellen!).
+- Öffnen Sie eine Sammlung, um die Positionen zu sehen: Nummer, Format, Wert, **Menge (+/−)**, Status.
+- **Reihenfolge:** mit **↑**/**↓**. **✕** entfernt eine Position (die Nummern rücken auf).
+- **Drei getrennte Status-Angaben** je Code – bewusst kein gemeinsamer grüner Haken:
+  - **Syntax:** richtige Länge und Zeichen?
+  - **Prüfziffer:** mathematisch korrekt (bei EAN)?
+  - **Artikelstamm:** bekannt / inaktiv / unbekannt – nur bezogen auf den **importierten Stand** (Tooltip zeigt Quelle und Datum), **nicht** auf den aktuellen Zustand Ihrer Kasse. Ein „bekannter“ Artikel kann an der Kasse trotzdem unbekannt sein und umgekehrt.
+- **Mit Artikelstamm abgleichen** (Artikelstamm unter *Einstellungen* importieren), **CSV exportieren**, **Backup (JSON)**.
+
+## 5. Zahlenreihen und Präfix-Vorlagen (Bereich **Generator**)
+**Einzelcode:** Format und Inhalt eingeben – die Vorschau erscheint sofort. Bei EAN-13/EAN-8 mit 12 bzw. 7 Ziffern können Sie die **Prüfziffer berechnen** lassen (nur auf Ihren Klick). Mit **Zur Sammlung hinzufügen** übernehmen Sie den Code.
+
+**Zahlenreihe – Beispiel `2 063701 028{XX}{C}`, Schritt `+12`:**
 - `2 063701 028` ist der **feste Teil** (10 Stellen), `{XX}` das **variable Feld** (2 Stellen), `{C}` die **Prüfziffer**, die die App selbst berechnet.
-- Es entstehen die Felder `00, 12, 24, 36, 48, 60, 72, 84, 96` – also 9 gültige EAN-13. Die letzte Ziffer jedes Codes wird jedes Mal neu berechnet, sie wird nie hochgezählt.
-- Passt ein Wert nicht mehr in das Feld (z. B. Endwert 100 bei zwei Stellen), meldet die App einen **Überlauf** und erzeugt nichts. Es wird nie abgeschnitten.
-- Liegt der Endwert nicht auf dem Raster (+12), endet die Reihe beim letzten passenden Wert; die Vorschau zeigt dazu eine Warnung.
-- EAN-13 braucht genau 12 Stellen vor der Prüfziffer (EAN-8: 7).
-- Testen Sie neue Nummernbereiche zuerst mit einem freigegebenen Testprozess: In Ihrem Kassensystem können einzelne Stellen eine besondere Bedeutung haben (z. B. Preis oder Gewicht).
+- Schaltfläche **„Beispiel einfügen“** füllt Format, Schablone, Start `0`, Ende `96`, Schritt `12`.
+- Ergebnis: Felder `00, 12, 24, 36, 48, 60, 72, 84, 96` → **9 gültige EAN-13**. Die letzte Ziffer wird für jeden Code neu berechnet, sie wird nie hochgezählt.
+- **Start, Ende und Schritt** beziehen sich nur auf das variable Feld. Statt des Endwerts können Sie eine **Anzahl** angeben.
+- **Überlauf:** Passt ein Wert nicht mehr ins Feld (z. B. Endwert 100 bei zwei Stellen, oder 10 Positionen mit Schritt 12), meldet die App „Überlauf“ **feldgenau** in Rot und erzeugt **nichts**. Es wird nie abgeschnitten.
+- **Endwert außerhalb des Rasters** (z. B. Ende 50 bei Schritt 12): Die Reihe endet beim letzten passenden Wert (48); die Vorschau zeigt eine Warnung.
+- **EAN-13 braucht genau 12 Stellen** vor der Prüfziffer (EAN-8: 7); die App meldet, wenn Ihre Schablone eine andere Länge hat.
+- Speichern können Sie als **Vorlage**, als **neue Sammlung** oder **in eine bestehende Sammlung**.
+- **Vorsicht im Kassenbetrieb:** In Ihrem Kassensystem können einzelne Stellen eine besondere Bedeutung haben (z. B. Preis oder Gewicht). Testen Sie neue Nummernbereiche nur in einem freigegebenen Testprozess.
 
-## Vorab: Listen einfügen
+## 6. Der Kassen-Fader (Bereich **Fader**)
+**Vorbereiten:** Sammlung, **Scannerprofil**, **Modus** und optional **Smart-Interleaving** wählen, **Start**. Vor dem Start prüft die App, dass **jeder** Code darstellbar ist; sonst startet sie nicht und nennt die Position.
 
-Pro Zeile ein Code. Fehlerhafte Zeilen werden mit Zeilennummer gemeldet (z. B. „Zeile 7: Prüfziffer falsch (erwartet 1 …)“) und **nicht** automatisch korrigiert. Leerzeilen werden ignoriert.
+**Modi**
+- **Manuell:** Jede Position wird kurz angezeigt, dann wartet die App. Sie prüfen die Kasse und tippen **„Geprüft – weiter“** (oder Enter).
+- **Automatik:** Die Codes laufen ohne Rückmeldung der Kasse durch. Nur „angezeigt“ wird protokolliert.
+- **Kleinstapel:** Nach N Codes wartet die App auf Ihre Bestätigung – ein Fehler betrifft dann höchstens einen kleinen Stapel.
 
-## Vorab: Wie der Kassen-Fader arbeitet (Bedienung folgt in Meilenstein 6)
+**Smart-Interleaving:** Manche Scanner lesen identische Codes direkt hintereinander verzögert. Der Schalter mischt die Reihenfolge so, dass gleiche Codes möglichst nicht direkt aufeinander folgen (die Zahl vermiedener Übergänge wird angezeigt). Ohne identische Nachbarn bleibt die Reihenfolge unverändert.
 
-- Zwischen zwei Codes ist die Fläche immer **leer (weiß)** – es gibt nie eine Überblendung.
-- Bei **Pause, Fehler oder Wechsel in eine andere App/einen anderen Tab** verschwindet der Code **sofort**, damit die Kasse ihn nicht doppelt liest.
-- Modi: **Manuell** (jede Position nach Ihrer Bestätigung), **Automatik** (ohne Rückmeldung der Kasse; nur „angezeigt“ wird protokolliert) und **Kleinstapel** (nach N Codes wird auf Ihre Bestätigung gewartet).
-- Nach einer Unterbrechung zeigt die App den **unklaren Bereich**: Positionen, die angezeigt, aber von Ihnen nicht bestätigt wurden. Sie wählen: **abgeglichen** (Kasse geprüft), **wiederholen** (Vorsicht: Doppelbuchung möglich), **überspringen** oder **ab Position** fortsetzen. Es wird nie automatisch nachgeholt. Fortgesetzt wird immer mit einem kurzen Countdown.
-- „Bestätigt“ heißt: **Sie** haben an der Kasse nachgesehen – nicht, dass die Kasse es gemeldet hat.
-- **Identische Artikel nacheinander** liest mancher Scanner nur verzögert. Der Schalter „Smart-Interleaving“ mischt die Reihenfolge so, dass gleiche Codes möglichst nicht direkt aufeinander folgen.
+**Während der Sitzung**
+- **Start-Countdown** (in der unteren Leiste), dann erscheint der erste Code **schwarz auf weiß** auf der Anzeigefläche. Zwischen zwei Codes ist die Fläche **immer leer (weiß)** – es gibt **keine Überblendung**.
+- Die **Bedienleiste** liegt **unter** der Anzeigefläche, nie über dem Code. **STOPP / Pause** ist die große rote Schaltfläche. Mit einem Bluetooth-Taster/Tastatur: **Leertaste oder Escape = Pause**, **Enter = Bestätigen**.
+- **Pause, Fehler und App-Wechsel blenden den Code sofort aus** – damit die Kasse ihn nicht doppelt liest. Das gilt auch, wenn Sie den Tab wechseln, den Bildschirm sperren oder die App in den Hintergrund schicken.
+- Der Bildschirm bleibt während der Sitzung an (sofern Ihr Gerät das erlaubt).
+- Die Navigation ist während einer Sitzung gesperrt; beenden oder brechen Sie die Sitzung zuerst ab.
 
-## Vorab: Sicherung (Backup) und Austausch (Bedienung folgt in Meilenstein 6)
+**Zusammenfassung:** Am Ende sehen Sie, wie viele Positionen **angezeigt** und wie viele von Ihnen **bestätigt** wurden – ohne Aussage über Kassenbuchungen.
 
-- **JSON-Backup** enthält alles (Sammlungen, Vorlagen, Profile, Artikelstamm, Sitzungsprotokolle). Erstellen Sie regelmäßig eine Sicherung – der Browser-Speicher kann gelöscht werden, auch wenn die App „persistenten Speicher“ erhält.
-- **Wiederherstellen** ersetzt alle aktuellen Daten. Die Datei wird zuerst vollständig geprüft; ist sie fehlerhaft, bleiben Ihre Daten unverändert. Die Fehlermeldung nennt die betroffene Stelle (z. B. `data.items[3].quantity`).
-- **CSV-Export/-Import** eignet sich für den Austausch mit Tabellen. Wichtig: Öffnen Sie CSV-Dateien nicht einfach per Doppelklick in Excel – führende Nullen gehen sonst verloren. Importieren Sie die Spalte „value“ als **Text**. Verlorene Nullen werden beim Import als Fehler gemeldet, nicht still ergänzt.
-- Werte, die mit `=`, `+`, `-` oder `@` beginnen, werden im Export mit einem vorangestellten `'` geschützt, damit Tabellenprogramme sie nicht als Formel ausführen; beim Import der App wird das `'` wieder entfernt.
-- **Artikelstamm-CSV** (Spalten z. B. `EAN`, `Aktiv`, `Bezeichnung`): Danach zeigt die App je Code „bekannt / inaktiv / unbekannt“ – bezogen auf den **importierten Stand** und dessen Datum, nicht auf den aktuellen Zustand Ihrer Kasse.
+## 7. Wenn die Kasse eine Fehlermeldung zeigt
+Zeigt die Kasse einen Dialog (z. B. unbekannter Artikel), während die Codes laufen:
+1. Tippen Sie **sofort auf STOPP / Pause** (oder Leertaste/Escape). Der Code verschwindet.
+2. Lösen Sie den Kassendialog.
+3. Die App zeigt den **unklaren Übergabebereich**:
+   - *Zuletzt von Ihnen bestätigt:* Position X
+   - *Zuletzt angezeigt:* Position Y
+   - *Unklarer Bereich:* Positionen X+1 bis Y – angezeigt, aber nicht von Ihnen bestätigt. Ob die Kasse sie angenommen, verworfen oder zwischengespeichert hat, weiß die App **nicht**.
+4. **Prüfen Sie die Kasse** und wählen Sie:
+   - **Kasse abgeglichen – weiter nach Position Y:** Sie haben geprüft, alles bis Y ist erledigt. Das wird als **von Ihnen bestätigt** protokolliert.
+   - **Unklaren Bereich wiederholen:** zeigt den Bereich erneut. **Achtung: Doppelbuchungen sind möglich**, wenn einzelne Artikel schon gebucht sind (Rückfrage).
+   - **Unklaren Bereich überspringen:** weiter nach Y, der Bereich bleibt unbestätigt im Protokoll (Rückfrage).
+   - **Ab dieser Position:** frei wählbare Fortsetzung.
+   - **Sitzung abbrechen** (Rückfrage).
+5. Nach Ihrer Wahl startet immer ein kurzer **Countdown**; verpasste Codes werden **nie automatisch nachgeholt**.
 
-## Vorab: So werden Codes angezeigt (Generator/Fader, Bedienung folgt in Meilenstein 6)
+**Tipp:** Verwenden Sie den **Kleinstapel-Modus** und, wenn möglich, vorher den **Artikelstamm-Abgleich** – dann ist ein Fehler klein und unbekannte Artikel fallen vorab auf.
 
-- Codes erscheinen immer **schwarz auf weiß**, auch im Dunkelmodus des Telefons, mit dem vorgeschriebenen weißen Rand rundherum. Bitte keine Hüllen oder Schutzfolien mit Spiegelung verwenden und die Bildschirmhelligkeit hoch einstellen.
-- Die Größe wird immer in **ganzen Bildschirmpunkten pro Strich** berechnet, damit die Striche scharf bleiben. Passt ein Code nicht auf den Bildschirm, meldet die App das – sie quetscht ihn nicht.
-- **Lange Strichcodes** (z. B. Code 128 mit vielen Zeichen) werden bei Bedarf automatisch **um 90° gedreht**, damit sie größer dargestellt werden können. Halten Sie das Telefon dann entsprechend zum Scanner.
-- QR-Codes enthalten reinen Text. Die App öffnet nie Links und führt nie etwas aus.
+## 8. Kassen-Kalibrierung (20er-Test)
+Ziel: Anzeige- und Leerzeit finden, die Ihre Kasse zuverlässig annimmt (*Einstellungen → 20er-Kalibrierung starten*).
+1. Legen Sie eine **Testsammlung mit Artikeln an, die Ihre Kasse kennt** (nur in einem freigegebenen Testprozess!). Mit weniger als 20 Positionen wiederholt die App die Codes zyklisch; Mengen > 1 testen auch identische Folgecodes.
+2. Wählen Sie das **Profil**, das Sie testen möchten, und starten Sie den Lauf: 20 Codes werden automatisch angezeigt.
+3. Tragen Sie danach ein: **von der Kasse angenommen** (von 20), **zusätzliche Buchungen**, **Fehlerdialoge**.
+4. **Auswerten** zeigt eine Erläuterung und einen Vorschlag:
+   - **Fehlerfrei:** Betriebsprofil mit **25 % Reserve**.
+   - **Positionen fehlen:** langsameres Profil (×1,5).
+   - **Zusätzliche Buchungen:** kürzere Anzeige.
+   - **Beides** oder **Fehlerdialoge:** kein Vorschlag – Lauf mit bekannten Testartikeln wiederholen.
+5. **Als Profil speichern** übernimmt den Vorschlag.
 
-## Vorab: Scannen im Lager (Bedienung folgt in Meilenstein 6)
+Die Werte sind **Teststartpunkte, keine Garantie**. Wiederholen Sie wichtige Einstellungen mehrfach und planen Sie Reserve ein. Die mitgelieferten Profile (Langsam, Normaltest, Schnelltest, Identische Codes) sind ebenfalls nur Startpunkte. Die **Leerzeit ist mindestens 20 ms**, damit zwischen zwei Codes sicher ein leeres Bild liegt.
 
-- **Kamera:** Die App nimmt bevorzugt die **Rückkamera**. Beim ersten Start fragt der Browser nach der Kameraberechtigung – bitte erlauben. Die Kamera funktioniert nur über eine sichere Verbindung (HTTPS) bzw. als installierte App. Wird die Berechtigung verweigert oder die Kamera von einer anderen App benutzt, zeigt die App eine verständliche Meldung; **Foto-Import** und **manuelle Eingabe** funktionieren dann trotzdem.
-- **Ein Code, ein Eintrag:** Halten Sie den Code ruhig vor die Kamera. Bleibt er dauerhaft im Bild, wird er **nur einmal** erfasst. Soll derselbe Artikel mehrfach gezählt werden, nehmen Sie den Code kurz aus dem Bild (etwa eine Sekunde) und halten ihn erneut davor – oder ändern Sie die Menge direkt mit **+**/**−**. Im Modus „nur eindeutige Codes“ werden Wiederholungen ignoriert.
-- **Ton und Vibration** bestätigen, dass der Code **tatsächlich gespeichert** wurde. Gab es einen Speicherfehler, hören Sie das tiefe Fehlersignal und der Code wurde **nicht** gespeichert. Ton wird erst nach Ihrem ersten Tippen auf der Seite freigeschaltet (Browser-Vorgabe).
-- **Taschenlampe:** nur verfügbar, wenn Ihr Gerät sie für die Kamera anbietet.
-- **Foto-Import:** Wählen Sie ein oder mehrere Fotos. Finden sich mehrere Codes in einem Bild, wählen Sie aus, welche übernommen werden. Bilder ohne erkennbaren Code oder nicht lesbare Bilder werden als solche gemeldet. Fotos werden nicht gespeichert, nur die ausgewählten Codes (der Dateiname dient als Bezeichnung).
-- **Nur freigegebene Formate** werden übernommen: EAN-13, EAN-8, QR-Code (Text) und Code 128. Erkennungen mit falscher Prüfziffer werden verworfen und nicht korrigiert.
-- **UPC-A:** Ein UPC-A-Strichcode ist technisch ein EAN-13 mit führender 0 und wird deshalb standardmäßig als **EAN-13** (13 Ziffern) gespeichert. UPC-A als eigenes Format kann in den Einstellungen freigegeben werden.
-- **QR-Codes** werden nur als Text gespeichert. Die App **öffnet nie Links** und führt nichts aus; Links, WLAN- und Kontaktdaten werden nur angezeigt, gefährliche Schemata (z. B. `javascript:`) mit Warnung.
-- **Offline:** Die Codeerkennung läuft komplett auf dem Gerät (lokale Datei `wasm/zxing_reader.wasm`); nach der ersten Installation brauchen Sie kein Netz.
+## 9. Backup (JSON) und CSV-Austausch
+**JSON-Backup** (*Einstellungen → Backup herunterladen* oder in einer Sammlung): enthält alles – Sammlungen, Vorlagen, Profile, Artikelstamm, Sitzungsprotokolle. Der Browser-Speicher kann gelöscht werden (auch bei „persistentem Speicher“); sichern Sie regelmäßig.
 
-**Wichtig vorab:** BarQPlayer zeigt Codes an. „Angezeigt“ bedeutet nie „an der Kasse gebucht“.
+**Wiederherstellen** ersetzt **alle** aktuellen Daten. Die Datei wird zuerst **vollständig geprüft**; ist sie fehlerhaft, bleiben Ihre Daten unverändert und die Meldung nennt die Stelle (z. B. `data.items[3].quantity`). Sie müssen den Austausch ausdrücklich bestätigen.
+
+**CSV-Export** (in der Sammlung) eignet sich für Tabellen. **Wichtig:** Öffnen Sie CSV-Dateien nicht einfach per Doppelklick in Excel – führende Nullen gehen sonst verloren. Importieren Sie die Spalte „value“ als **Text**. Verlorene Nullen werden beim Import als Fehler gemeldet, nicht still ergänzt. Werte, die mit `=`, `+`, `-` oder `@` beginnen, werden im Export mit einem vorangestellten `'` gegen Tabellenformeln geschützt; beim Import der App wird das `'` wieder entfernt.
+
+**Artikelstamm-CSV** (*Einstellungen → Artikelstamm*): Spalten z. B. `EAN`, `Aktiv`, `Bezeichnung`. Bei Fehlern wird standardmäßig **nichts importiert** und jede fehlerhafte Zeile gemeldet; mit „Fehlerhafte Zeilen überspringen“ werden die gültigen übernommen.
+
+## 10. Fehlerbehebung
+| Problem | Lösung |
+|---|---|
+| „Der Kamerazugriff wurde verweigert“ | In den Chrome-/Android-Einstellungen die Kameraberechtigung für die App erlauben; bis dahin **Foto-Import** oder **manuelle Eingabe** nutzen. |
+| „Die Kamera ist nur über HTTPS oder localhost verfügbar“ | App über eine HTTPS-Adresse öffnen bzw. installierte App verwenden. |
+| „Kamera wird von einer anderen App verwendet“ | Andere Apps schließen (Videoanruf, Taschenlampen-Apps), erneut starten. |
+| Taschenlampe ausgegraut | Ihr Gerät bietet sie für diese Kamera nicht an. |
+| „Die lokale Decoder-Datei (WASM) konnte nicht geladen werden“ | App einmal **online** neu laden, damit alle Offline-Dateien vorhanden sind; danach erneut versuchen. |
+| Code wird nicht erkannt | Näher/ruhiger halten, Beleuchtung/Taschenlampe, Foto-Import mit schärferem Bild. Nur freigegebene Formate werden übernommen. |
+| Erkennung mit falscher Prüfziffer verworfen | Beschädigter oder falsch erkannter Code; erneut scannen. Es wird nie korrigiert. |
+| „Die Daten konnten nicht gespeichert werden“ | Speicherplatz prüfen, Backup erstellen, Sammlungen aufräumen. Der Eintrag ist **nicht** gespeichert. |
+| „Der Browser-Speicher ist voll“ | Alte Sammlungen exportieren und löschen. |
+| Zahlenreihe meldet Überlauf | Feldbreite vergrößern (mehr `X`), Endwert senken oder Schritt verringern. |
+| Fader startet nicht („Position n …“) | Der genannte Code ist nicht darstellbar (z. B. zu langer Text) oder passt nicht auf den Bildschirm; entfernen/kürzen. |
+| Scanner liest identische Codes nicht | **Smart-Interleaving** einschalten oder das Profil „Identische Codes“ bzw. eine längere Leerzeit für identische Codes verwenden (Kalibrierung). |
+| Sitzung zeigt „Fehler“ | Der Code wurde sofort ausgeblendet. Kasse prüfen, dann wie in Kapitel 7 fortfahren. Details unter *Einstellungen → Diagnose* (ohne Barcode-Inhalte). |
+| Daten verschwunden | Browserdaten gelöscht? Letztes **Backup wiederherstellen** (Kapitel 9). |
+
+**Diagnose:** *Einstellungen → Diagnose* zeigt Decoder-Engine, App-Version und das Fehlerprotokoll. Es enthält Fehlercodes, aber keine Barcode-Inhalte.

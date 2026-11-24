@@ -237,6 +237,15 @@ export class CollectionService {
       .first();
   }
 
+  /**
+   * Zählt die Positionen einer Sammlung.
+   * @param collectionId - Sammlung.
+   * @returns Anzahl der Positionen (nicht der Mengen).
+   */
+  async countItems(collectionId: string): Promise<number> {
+    return this.db.items.where('collectionId').equals(collectionId).count();
+  }
+
   /** @returns Einträge einer Sammlung nach Position sortiert. */
   async listItems(collectionId: string): Promise<BarcodeItem[]> {
     const items = await this.db.items.where('collectionId').equals(collectionId).toArray();

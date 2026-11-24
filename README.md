@@ -9,7 +9,8 @@ Offline-first Android-PWA zum Scannen, Erzeugen (EAN-13, EAN-8, QR-Code, Code 12
 - ✅ M3 Persistenz: Dexie-Schema v1, Sammlungs-/Artikelstamm-Service, JSON-Backup mit atomarem Restore, CSV-Austausch mit Formelschutz
 - ✅ M4 Renderer: bwip-js-Modulmuster → eigenes SVG (`#000`/`#FFF`, `crispEdges`, ganzzahlige Pixel pro Modul, Ruhezonen, 90°-Drehung, Lookahead-Cache), per zxing-wasm rückgelesen
 - ✅ M5 Erfassung: Kamera-Adapter (Rückkamera, Wechsel, Taschenlampe), Hybrid-Decoder (nativ → zxing-wasm, lokales WASM), Capture-Service (Debounce, Ton/Vibration nach Speichern), Bildimport, QR nur als Daten
-- ⏳ M6–M7: UI, Offline-Härtung, Lift-to-Pause
+- ✅ M6 Oberfläche: Scanner, Sammlungen, Generator (Zahlenreihen), Fader mit Wiederaufnahme-Dialog, Einstellungen (Profile, 20er-Kalibrierung, Artikelstamm, Backup/Restore, Diagnose), Fehlerbanner, globale Fehler-/Hintergrund-Absicherung
+- ⏳ M7: Offline-Härtung (Service Worker, Update-Policy, Icons), Lift-to-Pause, Endabnahme
 
 Detailstand: [`docs/PFLICHTENHEFT_STATUS.md`](docs/PFLICHTENHEFT_STATUS.md).
 

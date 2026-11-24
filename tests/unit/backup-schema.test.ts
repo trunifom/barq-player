@@ -254,12 +254,17 @@ describe('Profile', () => {
   });
 
   it('validateProfile meldet Probleme', () => {
-    const ok = { id: 'x', name: 'n', displayMs: 1, blankMs: 0, identicalBlankMs: 0, startDelayMs: 0 };
+    const ok = { id: 'x', name: 'n', displayMs: 1, blankMs: 20, identicalBlankMs: 20, startDelayMs: 0 };
     expect(validateProfile(ok)).toEqual([]);
     expect(validateProfile({ ...ok, id: '' })).toHaveLength(1);
     expect(validateProfile({ ...ok, name: '  ' })).toHaveLength(1);
     expect(validateProfile({ ...ok, displayMs: 0 })).toHaveLength(1);
     expect(validateProfile({ ...ok, blankMs: -1 })).toHaveLength(1);
+    // Mindest-Leerzeit: ein leerer Frame zwischen zwei Symbolen muss garantiert sein
+    expect(validateProfile({ ...ok, blankMs: 19 })).toHaveLength(1);
+    expect(validateProfile({ ...ok, blankMs: 0 })).toHaveLength(1);
+    expect(validateProfile({ ...ok, identicalBlankMs: 19 })).toHaveLength(1);
+    expect(validateProfile({ ...ok, blankMs: 20, identicalBlankMs: 20 })).toEqual([]);
     expect(validateProfile({ ...ok, identicalBlankMs: Number.NaN })).toHaveLength(1);
     expect(validateProfile({ ...ok, startDelayMs: 700_000 })).toHaveLength(1);
   });

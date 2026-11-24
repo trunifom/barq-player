@@ -43,3 +43,19 @@ describe('mehrzeilige QR-Texte durchgängig', () => {
     expect((await db2.items.toArray()).map((i) => i.value)).toContain(vcard);
   });
 });
+
+describe('countItems', () => {
+  it('zählt Positionen (nicht Mengen) je Sammlung', async () => {
+    const db = freshDb();
+    const svc = new CollectionService(db, testDeps());
+    const a = await svc.createCollection('A');
+    const b = await svc.createCollection('B');
+    await svc.addItems(a.id, [
+      { symbology: 'EAN13', value: '4006381333931', source: 'manual', quantity: 5 },
+      { symbology: 'QRCode', value: 'x', source: 'manual' }
+    ]);
+    expect(await svc.countItems(a.id)).toBe(2);
+    expect(await svc.countItems(b.id)).toBe(0);
+    expect(await svc.countItems('unbekannt')).toBe(0);
+  });
+});

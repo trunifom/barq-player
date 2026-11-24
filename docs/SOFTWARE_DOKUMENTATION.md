@@ -190,6 +190,48 @@ Vitest; Unit-Tests in `tests/unit/`, Integration in `tests/integration/` (`fake-
 
 Hinweis Windows: Vitest aus Git Bash gestartet scheitert wegen Pfad-Schreibweise (`c:` vs. `C:`, doppelte Modulinstanzen, „failed to find the current suite“). Tests aus PowerShell/cmd starten.
 
+## 7a. Oberfläche und App-Schicht (Meilenstein 6)
+
+**Aufbau:** `main.ts` → `app/bootstrap.ts` (Shell, Router, Lebenszyklus) → `app/container.ts` (Composition Root, `AppContext`) → Screens in `ui/screens/` (`scanner`, `collections`, `generator`, `player`, `settings`) mit Komponenten in `ui/components/` (`dom`, `notifier`, `dialog`, `badges`). Jeder Screen ist eine Funktion `mountX(root, ctx, route) → dispose`; der Router ruft `dispose` beim Verlassen (Kamera stoppen, Timer löschen, Fader pausieren).
+
+**DOM-Sicherheit:** Framework-freies `h()`; Texte sind IMMER Text-Knoten (nie `innerHTML`), SVG wird über den XML-Parser importiert (`svgElement`). Sammlungsnamen, QR-Inhalte, Dateinamen und Fehlertexte sind unvertrauenswürdig und können kein Markup einschleusen (Tests mit `<img onerror>`).
+
+**Router (`app/routes.ts`):** Hash-Routen `#/scanner|collections|generator|player|settings` mit Parametern (`#/player?collection=ID`, `?calibration=1`). Ein Guard verhindert das Verlassen des Fader-Screens bei laufender Sitzung: sofort pausieren, Hash zurücksetzen, Hinweis „zuerst abbrechen oder beenden“.
+
+**Lebenszyklus (`app/lifecycle.ts`):**
+| Ereignis | Reaktion (Reihenfolge ist sicherheitsrelevant) |
+|---|---|
+| `error`, `unhandledrejection` | 1. laufende Sitzung → `ERROR` (Symbol sofort aus), 2. Log + Fehlerbanner. ResizeObserver-Rauschen wird ignoriert. |
+| `visibilitychange` hidden, `pagehide`, `freeze` | Sitzung pausiert sofort (`pause('background')`), Scanner-Kamera stoppt |
+| `visibilitychange` visible | Wake Lock erneut anfordern |
+
+**Meldungen (`Notifier`):** Fehler laufen immer durch den `ErrorLogger` und erscheinen als `role="alert"` mit deutscher Meldung, Handlungsempfehlung und Code (bleiben bis zum Schließen; gleiche Fehler werden nicht gestapelt). Infos/Erfolge sind `role="status"` und verschwinden nach 4 s. **„Gespeichert“ wird nur nach erfolgreichem Rückgabewert des Service-Aufrufs gemeldet.**
+
+**Scanner-Screen:** Sammlung wählen/anlegen; Kamera (Start entsperrt Audio, Torch, Wechsel, Stopp bei Hintergrund/Verlassen); Scan-Schleife alle 250 ms, Auswertungen überlappen nie; Format-Whitelist und „nur eindeutige Codes“ (Einstellungen, Decoder wird bei Änderung neu aufgebaut); Foto-Import mit Auswahl der Codes je Bild; manuelle Eingabe/Bulk mit „Prüfen“ (zeilengenaue Fehler) und ausdrücklichem „Nur die N gültigen Zeilen speichern“.
+
+**Sammlungen-Screen:** Liste, anlegen/umbenennen/löschen (Bestätigung), Detail als Tabelle mit Menge (+/−), Reihenfolge (↑/↓ statt Ziehen), Entfernen, **drei getrennte Status-Badges** (Syntax, Prüfziffer, Artikelstamm – Text statt nur Farbe, Tooltip mit Quelle/Datum), Artikelstamm-Abgleich, CSV-/JSON-Export.
+
+**Generator-Screen:** Einzelcode mit Live-Vorschau (QR-ECC wählbar); Prüfziffer nur auf Klick berechnen; Zahlenreihe mit Schablone, Start/Ende **oder Anzahl**/Schritt/Obergrenze, Preset `2 063701 028{XX}{C}` (+12), Live-Vorschau (Anzahl, erste/letzte Codes, Symbol des ersten), feldgenaue Fehler und Warnungen (`data-field`, `data-code`, Überlauf = `role="alert"`), Speichern als Vorlage, neue Sammlung oder in bestehende Sammlung.
+
+**Player-Screen** (Sicherheitsregeln): Bühne (`#stage`, weiß, `barcode-stage`) und Steuerleiste sind getrennte Bereiche – nie Bedienelemente über dem Symbol; Viewport für den Renderer = Fenster − 176 px Leiste. Der Zustands-Listener leert die Bühne **zuerst** und zeichnet das Symbol nur im Zustand `SHOWING`; ein Renderfehler wirft und führt zu `ERROR` mit leerer Bühne. Keine Animationen/Transitions im Fader (CSS `transition/animation: none !important`). Countdown erscheint in der Leiste (nicht auf der Bühne). Zustände: Countdown, Anzeige, Wechsel, Warten auf Bestätigung („Geprüft – weiter“), Pause/Fehler mit **Panel für den unklaren Übergabebereich** (zuletzt bestätigt, zuletzt angezeigt, Bereich, Doppelbuchungswarnung) und Entscheidungen *abgeglichen / wiederholen / überspringen / ab Position / abbrechen* (wiederholen, überspringen, abbrechen mit Bestätigungsdialog), Zusammenfassung ohne Buchungsbehauptung. Externe Tasten (Bluetooth-Taster): Leertaste/Escape = Pause, Enter = Bestätigen (nicht in Eingabefeldern). Wake Lock wird mit Sitzungsstart angefordert und bei Rückkehr erneut.
+
+**Einstellungen-Screen:** Profile (anlegen/bearbeiten/löschen, Leerzeit ≥ 20 ms), Kalibrierung, Artikelstamm-CSV (Abbruch oder „Fehlerhafte überspringen“, Fehlerbericht), Persistenzstatus/Belegung, JSON-Backup und **bestätigter, vorvalidierter Restore**, Rückmeldung (Ton/Vibration), Diagnose (Decoder-Engine samt Fallback-Grund, Fehlerprotokoll ohne Barcode-Inhalte, leeren).
+
+### Kassen-Kalibrierung (`domain/calibration.ts`, `domain/playback-entries.ts`)
+Ablauf: 20 Testpositionen (`buildCalibrationEntries`: Sammlung inkl. Mengen, zyklisch aufgefüllt, ohne Interleaving, Modus Automatik) → Bedienperson trägt ein: von der Kasse angenommen, zusätzliche Buchungen, Fehlerdialoge → `evaluateCalibration`:
+
+| Ergebnis | Vorschlag |
+|---|---|
+| fehlerfrei (20/20, 0 zusätzlich) | Betriebsprofil mit **25 % Reserve** (Anzeige/Leerzeiten ×1,25, auf 10 ms gerundet) |
+| Positionen fehlen | langsamer: alle Zeiten ×1,5 |
+| zusätzliche Buchungen | Anzeige ×0,75, Leerzeiten unverändert |
+| beides oder Fehlerdialoge | **kein Vorschlag**, Test wiederholen (Fehlerdialoge deuten auf unbekannte Artikel, nicht auf Timing) |
+
+Werte werden geklammert (Anzeige 100–5000 ms, Leerzeit 50–3000 ms, identisch 50–5000 ms). Die Empfehlung ist ein **Teststartpunkt, keine Garantie** (steht in jeder Erläuterung).
+
+### Wiedergabe-Controller (`application/playback-service.ts`)
+`prepare` (Sammlung laden, Liste bauen, optional interleaven, **Profil prüfen**, **jedes einzigartige Symbol vorab rendern** – nicht darstellbare oder nicht passende Codes verhindern den Start mit Positionsangabe) → `begin` (Sitzungskopf zuerst speichern; scheitert das, startet nichts; Maschine anlegen, Ereignisse und Status fortlaufend sequenziell in IndexedDB schreiben, Wake Lock) → `pauseActive/failActive/abortActive`. Protokoll-Schreibfehler werden gemeldet, blockieren aber nie das Ausblenden.
+
 ## 8. ADR-Protokoll
 Spezifikations-ADRs 01–05 gelten unverändert (Kap. 26). Ergänzungen:
 
@@ -267,3 +309,27 @@ Entscheidung: `validateCodeValue` erlaubt LF/CRLF bei QR nur mit `multiline: tru
 
 ### ADR-30: `base: './'` im Build
 Entscheidung: Relative Asset-Pfade. Grund: Betrieb unter Unterpfaden (z. B. GitHub Pages) und lokaler WASM-Pfad `./wasm/zxing_reader.wasm` bleiben gültig.
+
+### ADR-31: Framework-freie UI
+Entscheidung: Kleine `h()`-Helferfunktion statt Framework; Screens als `mount`-Funktionen mit `dispose`. Grund: Spezifikation 7.1 („kein großes UI-Framework nötig“), kleine Bundles, volle Kontrolle über den sicherheitskritischen Fader-DOM; Fachlogik bleibt ohnehin unabhängig.
+
+### ADR-32: Navigation während einer Fader-Sitzung gesperrt
+Entscheidung: Router-Guard pausiert und bleibt auf dem Fader; die Navigationsleiste ist während der Sitzung ausgeblendet. Grund: Verlassen der Ansicht darf nie ein sichtbares Symbol zurücklassen oder die Sitzung unbemerkt beenden; Abbruch ist eine ausdrückliche Entscheidung.
+
+### ADR-33: Ein Bundle, Chunk-Warnschwelle 1500 kB
+Entscheidung: `build.chunkSizeWarningLimit = 1500`. Grund: Offline-first, alle Dateien werden ohnehin vorab gecacht; Code-Splitting verringert die Offline-Gesamtgröße nicht (bwip-js ist groß). Der Build soll warnungsfrei bleiben.
+
+### ADR-34: Bühne und Steuerleiste getrennt, Viewport = Fenster − 176 px
+Entscheidung: Das Symbol wird für die Fläche oberhalb der Leiste skaliert; die Leiste überdeckt die Bühne nur in den Zuständen Pause/Fehler/Ende (dann ist die Bühne ohnehin leer). Grund: Spezifikation 18 („Keine Bedienelemente über dem Symbol“).
+
+### ADR-35: Mindest-Leerzeit 20 ms
+Entscheidung: Profile verlangen `blankMs`/`identicalBlankMs` ≥ 20 ms (mindestens ein Bild bei 60 Hz); die Maschine selbst bleibt rein und erlaubt 0. Grund: AGENTS.md Regel 6 („harter Wechsel mit leerem Blank-Frame“) ist bei 0 ms technisch nicht garantiert. `prepare` und `saveProfile` erzwingen die Grenze.
+
+### ADR-36: Kalibrierung als transparente Heuristik
+Entscheidung: Faktoren 1,25 / 1,5 / 0,75 und Klammerung (siehe Kalibrierungskapitel); Fehlerdialoge machen den Test ungültig. Grund: Spezifikation 15.3/15.4/23.5 – Reserve gegenüber der schnellsten gerade noch fehlerfreien Einstellung; ohne Rückkanal wird nur gemessen, was die Bedienperson eingibt.
+
+### ADR-37: Erst ausblenden, dann melden
+Entscheidung: Bei unbehandelten Fehlern ruft der Lebenszyklus `failActive` vor `report` auf; im Player wird die Bühne vor jedem Zeichnen geleert. Grund: Das Ausblenden ist sicherheitskritisch und darf nicht von Logging oder Banner-Darstellung abhängen.
+
+### ADR-38: Bedieneinstellungen in `localStorage`, Sachdaten in IndexedDB
+Entscheidung: `SettingsStore` (abgesichert, mit Standardwerten bei Fehlern) für Komfort-Einstellungen; alles Fachliche in Dexie/Backup. Grund: Einstellungen sind klein und synchron nötig; ihr Verlust ist unkritisch und im Backup nicht erforderlich.
