@@ -1,6 +1,6 @@
 {
   "name": "barq-player",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "BarQPlayer – Offline-first Android PWA zum Scannen, Erzeugen und zeitgesteuerten Abspielen (Barcode- & QR-Fader) von Lager-Codes.",

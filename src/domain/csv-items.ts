@@ -6,10 +6,11 @@
 import { AppError, type ErrorCode } from './errors';
 import { parseCsv, serializeCsv, unprotectFormula, type CsvDelimiter, type CsvRow } from './csv';
 import { validateCodeValue } from './bulk-parser';
+import { normalizeItemMeta, type ItemMeta } from './item-meta';
 import type { BarcodeItem, CatalogProduct, Symbology } from './types';
 
 /** Zielfelder der Spaltenzuordnung für Code-Listen. */
-export type CsvItemField = 'value' | 'symbology' | 'quantity' | 'label';
+export type CsvItemField = 'value' | 'symbology' | 'quantity' | 'label' | 'purpose' | 'note' | 'tags' | 'expiresAt';
 
 /** Zuordnung Feld → Spaltenindex (0-basiert). */
 export type CsvMapping = Partial<Record<CsvItemField, number>>;
@@ -25,6 +26,10 @@ export interface CsvItemRow {
   quantity: number;
   checksumStatus: BarcodeItem['checksumStatus'];
   label?: string;
+  purpose?: string;
+  note?: string;
+  tags?: string[];
+  expiresAt?: string;
 }
 
 /** Fehler zu einer CSV-Zeile. */
@@ -46,7 +51,11 @@ const FIELD_ALIASES: Record<CsvItemField, readonly string[]> = {
   value: ['value', 'wert', 'code', 'barcode', 'ean', 'gtin', 'inhalt', 'artikelnummer'],
   symbology: ['symbology', 'symbologie', 'format', 'typ', 'type'],
   quantity: ['quantity', 'menge', 'anzahl', 'qty'],
-  label: ['label', 'bezeichnung', 'name', 'beschreibung', 'artikel']
+  label: ['label', 'bezeichnung', 'name', 'beschreibung', 'artikel', 'wort'],
+  purpose: ['purpose', 'nutzen', 'zweck', 'verwendung', 'verwendungszweck'],
+  note: ['note', 'notiz', 'satz', 'kommentar', 'bemerkung', 'anmerkung', 'comment'],
+  tags: ['tags', 'tag', 'schlagwort', 'schlagworte', 'kategorie', 'kategorien'],
+  expiresAt: ['expiresat', 'expires', 'expiry', 'expirydate', 'ablaufdatum', 'ablauf', 'gueltigbis', 'gültigbis', 'verfallsdatum', 'mhd', 'bis']
 };
 
 /**
@@ -156,14 +165,26 @@ export function mapCsvItems(rows: readonly CsvRow[], mapping: CsvMapping, option
       errors.push(rowError(r.line, 'ERR_IMPORT_CSV_INVALID', `Ungültige Menge „${cell(r, mapping.quantity)}“ (erlaubt: 1–${MAX_QUANTITY}).`));
       continue;
     }
-    const label = cell(r, mapping.label).trim();
+    let meta: ItemMeta;
+    try {
+      meta = normalizeItemMeta({
+        label: cell(r, mapping.label),
+        purpose: cell(r, mapping.purpose),
+        note: cell(r, mapping.note),
+        tags: cell(r, mapping.tags),
+        expiresAt: cell(r, mapping.expiresAt)
+      });
+    } catch (error: unknown) {
+      errors.push(rowError(r.line, 'ERR_IMPORT_CSV_INVALID', error instanceof AppError ? error.userMessage : 'Ungültige Zusatzangaben.'));
+      continue;
+    }
     out.push({
       line: r.line,
       symbology,
       value: check.value,
       quantity,
       checksumStatus: check.checksum,
-      ...(label === '' ? {} : { label })
+      ...meta
     });
   }
   return { rows: out, errors };
@@ -207,7 +228,7 @@ export function parseItemsCsv(text: string, options: ParseItemsCsvOptions = {}):
  * @returns CSV-Text (Formelschutz aktiv).
  */
 export function itemsToCsv(items: readonly BarcodeItem[], collectionName: string): string {
-  const header = ['collection', 'position', 'symbology', 'value', 'quantity', 'label', 'source', 'syntaxStatus', 'checksumStatus', 'catalogStatus'];
+  const header = ['collection', 'position', 'symbology', 'value', 'quantity', 'label', 'purpose', 'note', 'tags', 'expiresAt', 'source', 'syntaxStatus', 'checksumStatus', 'catalogStatus'];
   const sorted = [...items].sort((a, b) => a.position - b.position);
   const rows = sorted.map((i) => [
     collectionName,
@@ -216,6 +237,10 @@ export function itemsToCsv(items: readonly BarcodeItem[], collectionName: string
     i.value,
     String(i.quantity),
     i.label ?? '',
+    i.purpose ?? '',
+    i.note ?? '',
+    (i.tags ?? []).join(', '),
+    i.expiresAt ?? '',
     i.source,
     i.syntaxStatus,
     i.checksumStatus,

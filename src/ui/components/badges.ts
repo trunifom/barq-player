@@ -2,6 +2,7 @@
  * Getrennte Status-Badges für Syntax, Prüfziffer und Artikelstamm (Spezifikation 5): bewusst KEIN gemeinsamer
  * grüner Haken. Jede Aussage trägt Text (nicht nur Farbe) und bleibt für sich lesbar.
  */
+import { describeExpiry, expiryInfo } from '../../domain/expiry';
 import type { BarcodeItem } from '../../domain/types';
 import { formatDateTime, h } from './dom';
 
@@ -51,14 +52,30 @@ export function describeStatus(item: Pick<BarcodeItem, 'syntaxStatus' | 'checksu
 }
 
 /**
- * Rendert die Badges eines Eintrags.
- * @param item - Eintrag.
- * @returns Container mit drei Badges.
+ * Beschreibt das Ablaufdatum eines Eintrags als Badge.
+ * @param expiresAt - Ablaufdatum `JJJJ-MM-TT` oder `undefined`.
+ * @param today - heutiger Kalendertag.
+ * @returns Badge oder `null`, wenn kein Ablaufdatum gesetzt ist.
  */
-export function statusBadges(item: Parameters<typeof describeStatus>[0]): HTMLElement {
+export function describeExpiryBadge(expiresAt: string | undefined, today: string): { text: string; tone: BadgeTone } | null {
+  if (expiresAt === undefined) return null;
+  const info = expiryInfo(expiresAt, today);
+  const text = describeExpiry(info, expiresAt);
+  return { text: info.state === 'expired' ? `ABGELAUFEN – ${text}` : text, tone: info.state === 'expired' ? 'bad' : info.state === 'soon' ? 'warn' : 'ok' };
+}
+
+/**
+ * Rendert die Badges eines Eintrags: Syntax, Prüfziffer, Artikelstamm und – falls gesetzt – das Ablaufdatum.
+ * @param item - Eintrag.
+ * @param today - heutiger Kalendertag; ohne Angabe entfällt das Ablauf-Badge.
+ * @returns Container mit den Badges.
+ */
+export function statusBadges(item: Parameters<typeof describeStatus>[0] & { expiresAt?: string | undefined }, today?: string): HTMLElement {
+  const expiry = today === undefined ? null : describeExpiryBadge(item.expiresAt, today);
   return h(
     'span',
     { class: 'badges' },
-    ...describeStatus(item).map((b) => h('span', { class: `badge badge--${b.tone}`, 'data-badge': b.key, ...(b.title ? { title: b.title } : {}) }, `${b.label}: ${b.text}`))
+    ...describeStatus(item).map((b) => h('span', { class: `badge badge--${b.tone}`, 'data-badge': b.key, ...(b.title ? { title: b.title } : {}) }, `${b.label}: ${b.text}`)),
+    expiry ? h('span', { class: `badge badge--${expiry.tone}`, 'data-badge': 'expiry' }, expiry.text) : null
   );
 }

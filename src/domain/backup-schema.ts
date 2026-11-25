@@ -6,6 +6,7 @@
  * übernommen); Barcode-Werte werden nie verändert.
  */
 import { AppError } from './errors';
+import { isValidDateString } from './expiry';
 import type {
   BarcodeItem,
   CatalogProduct,
@@ -96,6 +97,26 @@ class Reader {
     if (v === undefined) return undefined;
     if (typeof v !== 'string') {
       this.add(`${path}.${key}`, 'muss ein Text sein');
+      return undefined;
+    }
+    return v;
+  }
+
+  optTags(o: Rec, key: string, path: string): string[] | undefined {
+    const v = o[key];
+    if (v === undefined) return undefined;
+    if (!Array.isArray(v) || v.some((t: unknown) => typeof t !== 'string')) {
+      this.add(`${path}.${key}`, 'muss eine Liste von Texten sein');
+      return undefined;
+    }
+    return v as string[];
+  }
+
+  optDate(o: Rec, key: string, path: string): string | undefined {
+    const v = this.optStr(o, key, path);
+    if (v === undefined || v === '') return undefined;
+    if (!isValidDateString(v)) {
+      this.add(`${path}.${key}`, 'muss ein Datum im Format JJJJ-MM-TT sein');
       return undefined;
     }
     return v;
@@ -225,6 +246,10 @@ export function validateBackup(input: unknown): BackupValidation {
     const catalogSource = r.optStr(o, 'catalogSource', p);
     const catalogCheckedAt = r.optStr(o, 'catalogCheckedAt', p);
     const label = r.optStr(o, 'label', p);
+    const purpose = r.optStr(o, 'purpose', p);
+    const note = r.optStr(o, 'note', p);
+    const tags = r.optTags(o, 'tags', p);
+    const expiresAt = r.optDate(o, 'expiresAt', p);
     return {
       id: r.str(o, 'id', p, { nonEmpty: true }),
       collectionId: r.str(o, 'collectionId', p, { nonEmpty: true }),
@@ -239,7 +264,11 @@ export function validateBackup(input: unknown): BackupValidation {
       catalogStatus: r.oneOf(o, 'catalogStatus', p, CATALOG),
       ...(catalogSource === undefined ? {} : { catalogSource }),
       ...(catalogCheckedAt === undefined ? {} : { catalogCheckedAt }),
-      ...(label === undefined ? {} : { label })
+      ...(label === undefined ? {} : { label }),
+      ...(purpose === undefined ? {} : { purpose }),
+      ...(note === undefined ? {} : { note }),
+      ...(tags === undefined || tags.length === 0 ? {} : { tags }),
+      ...(expiresAt === undefined ? {} : { expiresAt })
     };
   });
 

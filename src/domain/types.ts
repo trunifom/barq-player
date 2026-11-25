@@ -46,7 +46,16 @@ export interface BarcodeItem {
   catalogStatus: CatalogStatus;
   catalogSource?: string;
   catalogCheckedAt?: string;
+  /** Wort / Bezeichnung (optional). */
   label?: string;
+  /** Nutzen / Verwendungszweck (optional). */
+  purpose?: string;
+  /** Satz / Notiz (optional). */
+  note?: string;
+  /** Tags (optional, eindeutig ohne Rücksicht auf Groß-/Kleinschreibung). */
+  tags?: string[];
+  /** Ablaufdatum `JJJJ-MM-TT`; ab dem Folgetag gilt der Code als abgelaufen (optional). */
+  expiresAt?: string;
 }
 
 /** Prüfziffernmodus einer Sequenz. */

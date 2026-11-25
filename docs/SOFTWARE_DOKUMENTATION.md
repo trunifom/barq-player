@@ -13,16 +13,18 @@ offline (Service Worker, unabhängig)
 
 | Schicht | Inhalt | Darf nicht |
 |---|---|---|
-| `src/domain/` | Prüfziffern, Sequenzen, Zustandsautomat, Interleaving, Fehler, Typen | DOM, `window`, Kamera, IndexedDB, Browser-/Node-APIs |
-| `src/application/` | Use-Cases (Capture, Collections, Playback, Backup, Validation) | direkt DOM anfassen |
-| `src/adapters/` | Kamera, Decoder, Renderer, Dexie, Sensoren | Fachentscheidungen treffen |
+| `src/domain/` | Prüfziffern, Sequenzen, Zustandsautomat, Interleaving, Fehler, Typen, Ablaufdatum (`expiry.ts`), Zusatzangaben (`item-meta.ts`), Austauschformat (`share-format.ts`) | DOM, `window`, Kamera, IndexedDB, Browser-/Node-APIs |
+| `src/application/` | Use-Cases (Capture, Collections, Playback, Backup, Import, Validation) | direkt DOM anfassen |
+| `src/adapters/` | Kamera, Decoder, Renderer, Dexie, Sensoren, Teilen (`share/`: Web Share, Zwischenablage, Link-Codec) | Fachentscheidungen treffen |
 | `src/ui/` | Mobile-first Screens/Komponenten | Fachlogik enthalten |
-| `src/offline/` | Service Worker, Update-Policy | – |
+| `src/offline/` | Service Worker, Update-Policy, Installationsaufforderung | – |
 
 Abhängigkeiten zeigen nur nach innen (`domain` kennt niemanden).
 
 ## 2. Datenmodell und Persistenz (`src/domain/types.ts`, `src/adapters/persistence/db.ts`)
 Siehe Spezifikation Kap. 16. Barcodes immer als `string`; `syntaxStatus`, `checksumStatus` und `catalogStatus` sind getrennte Aussagen (kein gemeinsamer „grüner Haken“).
+
+**Zusatzangaben je Code (ab 0.2.0):** `BarcodeItem` hat die optionalen Felder `label` (Wort), `purpose` (Nutzen), `note` (Satz), `tags` (Liste) und `expiresAt` (Kalendertag `JJJJ-MM-TT`). Sie sind **additiv und nicht indiziert**; das Dexie-Schema bleibt deshalb **Version 1** (kein Migrationsschritt), ältere Datenbanken und Backups bleiben gültig. Fehlende Angaben sind nicht als leere Felder gespeichert, sondern fehlen ganz (`normalizeItemMeta` liefert nur gesetzte Felder). Grenzen: Wort/Nutzen 100, Satz 500 Zeichen, höchstens 10 Tags à 30 Zeichen (`META_LIMITS`).
 
 **Dexie-Schema (Datenbank `barq-player`), aktuelle Version 1**
 
@@ -44,17 +46,30 @@ Siehe Spezifikation Kap. 16. Barcodes immer als `string`; `syntaxStatus`, `check
 
 ## 2a. Services (`src/application/`)
 - `CollectionService`: Sammlungen (Name 1–100 Zeichen), Einträge (`addItem(s)` validiert mit `validateCodeValue`; ungültige Werte werden abgelehnt, nie korrigiert; `addItems` ist atomar), Duplikatregel `merge` (Menge erhöhen, Standard) oder `append`, Menge 1–9999, Verschieben/Entfernen mit lückenloser Neunummerierung, Artikelstamm-Abgleich (`known`/`inactive`/`unknown` mit `catalogSource` und `catalogCheckedAt`; ohne Stamm bleibt `unchecked`), Vorlagen, Profile.
-- `BackupService`: JSON-Voll-Export/-Import, CSV-Export/-Import einer Sammlung, Artikelstamm-CSV.
+- `CollectionService` (ab 0.2.0 zusätzlich): `updateItemMeta` (ersetzt alle Zusatzangaben eines Eintrags, nicht angegebene entfallen), `setExpiry` (Ablaufdatum für mehrere Einträge atomar setzen/löschen), `uniqueCollectionName` (`Name`, `Name (2)` …), `importShare` (geteilte Sammlung als **neue** Sammlung anlegen; scheitert das Speichern der Codes, wird die neue Sammlung wieder entfernt). Beim Zusammenfassen gleicher Codes (`merge`) bleiben vorhandene Angaben erhalten, fehlende werden ergänzt (Tags werden vereinigt).
+- `BackupService`: JSON-Voll-Export/-Import, CSV-Export/-Import einer Sammlung, Artikelstamm-CSV; ab 0.2.0 `exportCollectionShare` (Austauschformat, optional kompakt) und `exportCollectionText`.
+- `ImportService` (ab 0.2.0): zweistufiger Import. `inspect(text, heute)` erkennt die Art am **Inhalt** (geteilte Sammlung, Voll-Backup, CSV, einfache Liste) und prüft vollständig, **ohne zu speichern**; `commitCollections` bzw. `commitRows` schreiben erst nach ausdrücklicher Bestätigung und immer **additiv** (neue Sammlungen bzw. zusätzliche Positionen). CSV/Listen: `abort` (Standard) oder `skip-invalid`; bei Abbruch entsteht keine leere neue Sammlung.
+- `PlaybackController.prepare` überspringt abgelaufene Positionen (`includeExpired: true` spielt alles ab; die Kalibrierung ignoriert das Datum) und meldet `skippedExpired`; sind alle abgelaufen, endet `prepare` mit `ERR_PLAYBACK_FAILED` und klarer Meldung.
 - `SessionService`: Sitzungskopf und Ereignisse (idempotent über Ereignis-ID).
 
 ## 2b. Backup-Format (`src/domain/backup-schema.ts`)
 `{ format: "barq-player-backup", schemaVersion, exportedAt, appVersion, data: { collections, items, templates, profiles, catalog, sessions, events } }`. `validateBackup` prüft die komplette Datei **vor** dem ersten Schreibzugriff: Struktur, Typen, Aufzählungen, `quantity`/`position` als ganze Zahlen, `value` als String (nie Zahl), eindeutige IDs, Verweise Eintrag→Sammlung und Ereignis→Sitzung, eindeutige Positionen je Sammlung; unbekannte Zusatzfelder werden verworfen, Probleme mit Pfad (`data.items[3].quantity`) gemeldet (max. 50). Import = Replace-All in einer Transaktion; ein Fehler mittendrin rollt alles zurück.
 
+## 2b-1. Austauschformat einer Sammlung (`src/domain/share-format.ts`)
+`{ format: "barq-player-collection", schemaVersion: 1, exportedAt, appVersion, collection: { name }, items: [{ symbology, value, quantity, label?, purpose?, note?, tags?, expiresAt? }] }`. Keine IDs, Sitzungen, Profile oder Artikelstammdaten. `validateShareFile` prüft **jeden** Code strikt (Format bekannt, `value` ist ein String, Syntax und Prüfziffer über `validateCodeValue`, Menge 1–9999, Zusatzangaben über `normalizeItemMeta`) und verwirft beim ersten Fehler die ganze Datei mit „Code N: …“. Höchstens 5000 Codes. `detectImportKind` unterscheidet `collection`, `backup`, `json-other` und `text` allein am Inhalt; `shareFilesFromBackupText` zerlegt ein Voll-Backup (über `validateBackup`) in je eine Austauschdatei pro Sammlung.
+
+**Link-Codec** (`src/adapters/share/link-codec.ts`): kompaktes JSON → gzip (`CompressionStream`, falls vorhanden, sonst unkomprimiert mit Präfix `r.`) → Base64URL, Präfix `g.`; Link = `<App-Adresse>#/collections?import=<Nutzlast>`. Der Hash-Teil einer URL verlässt den Browser nicht (kein Server). Grenzen: Nutzlast ≤ 6000 Zeichen (darüber wird zur Datei geraten), entpackt ≤ 2 MiB (Schutz vor Dekompressionsbomben); beschädigte oder abgeschnittene Links ergeben `ERR_IMPORT_SCHEMA_INVALID` mit verständlicher Meldung. Beim Öffnen wird der Hash sofort per `history.replaceState` bereinigt, damit ein Neuladen den Dialog nicht erneut öffnet.
+
+**Teilen-Adapter** (`share-adapter.ts`): `shareFile`/`shareJsonFile`/`shareText`/`copyText` kapseln `navigator.share`/`canShare`/`clipboard`. Ein abgebrochener Dialog (`AbortError`) ist kein Fehler; fehlende Unterstützung liefert `unsupported`, worauf die Oberfläche auf Download bzw. Kopieren ausweicht und das ehrlich meldet.
+
+## 2b-2. Ablaufdatum (`src/domain/expiry.ts`)
+Ablaufdatum = Kalendertag ohne Uhrzeit/Zeitzone. Gültig **bis einschließlich** dem Ablauftag, ab dem Folgetag `expired`; `soon` bei ≤ 7 Tagen (`EXPIRY_WARN_DAYS`). „Heute“ ist der Kalendertag der **Ortszeit** des Geräts und wird immer übergeben (deterministisch testbar; Schaltjahre und Monatsgrenzen über UTC-Tageszahlen). Ein ungültiges Datum zählt vorsichtshalber als abgelaufen. `parseDateInput` akzeptiert `JJJJ-MM-TT`, `TT.MM.JJJJ`, `T.M.JJJJ` und `TT/MM/JJJJ`, lehnt aber zweistellige Jahre ab (mehrdeutig).
+
 ## 2c. CSV (`src/domain/csv.ts`, `csv-items.ts`)
 - RFC-4180-Parser (Anführungszeichen, Zeilenumbrüche in Feldern, BOM, CRLF/LF/CR), Trennzeichen `,` `;` Tab automatisch erkannt, alle Zellen bleiben Strings. Offene Anführungszeichen u. Ä. → `ERR_IMPORT_CSV_INVALID` mit Zeilennummer.
 - **Formelschutz:** Beim Export erhält jede Zelle, die mit `=`, `+`, `-`, `@`, Tab oder CR beginnt (auch nach führenden `'`), ein vorangestelltes `'`; beim Import wird genau dieses eine `'` wieder entfernt (verlustfreier Round-Trip, getestet).
 - **Führende Nullen:** Werte werden nie in Zahlen umgewandelt. Hat ein Tabellenprogramm Nullen entfernt, meldet der Import einen Längenfehler samt Hinweis – es wird nicht „repariert“.
-- Export-Spalten: `collection, position (ab 1), symbology, value, quantity, label, source, syntaxStatus, checksumStatus, catalogStatus`. Import: Spaltenzuordnung per Kopfzeile (deutsch/englisch) oder manuell; Standardsymbologie für Dateien ohne Symbologie-Spalte; `abort` (Standard, nichts importieren) oder `skip-invalid`; Fehlerbericht pro Zeile.
+- Export-Spalten: `collection, position (ab 1), symbology, value, quantity, label, purpose, note, tags, expiresAt, source, syntaxStatus, checksumStatus, catalogStatus` (Tags mit `, ` verbunden). Beim Import werden zusätzlich die Spalten Nutzen/Satz/Tags/Ablaufdatum erkannt (deutsch/englisch, z. B. `Gültig bis`, `MHD`); ein ungültiges Datum oder zu lange Texte sind **zeilengenaue Fehler**. Import: Spaltenzuordnung per Kopfzeile (deutsch/englisch) oder manuell; Standardsymbologie für Dateien ohne Symbologie-Spalte; `abort` (Standard, nichts importieren) oder `skip-invalid`; Fehlerbericht pro Zeile.
 - Artikelstamm-CSV: Kennung (`EAN`/`GTIN`/`Code`/…), optional `Aktiv` (ja/nein/1/0/…) und `Bezeichnung`; doppelte Kennungen sind Fehler.
 
 ## 3. Zustandsautomat (`src/domain/playback-machine.ts`)
@@ -369,3 +384,24 @@ Entscheidung: TSDoc-, `any`-, Schichten- und Dokumentationsregeln sowie der Prec
 
 ### ADR-43: Windows/Git-Bash-Hinweis für Skripte
 Entscheidung: Tests und Builds unter Windows aus PowerShell/cmd starten (nicht aus Git Bash). Grund: Pfad-Schreibweise `c:` vs. `C:` führt zu doppelten Modulinstanzen in Vitest (siehe Testkonzept).
+
+### ADR-44: Zusatzangaben additiv, ohne Schema-Versionssprung
+Entscheidung: Wort, Nutzen, Satz, Tags und Ablaufdatum sind optionale, nicht indizierte Felder von `BarcodeItem`; Dexie-Schema und Backup-`schemaVersion` bleiben 1. Grund: Bestehende Datenbanken und Backups bleiben ohne Migration gültig; ältere App-Versionen verwerfen unbekannte Felder beim Import (statt abzulehnen). Fehlende Angaben werden nicht als leere Strings gespeichert, damit „nicht gesetzt“ eindeutig bleibt.
+
+### ADR-45: Ablaufdatum als Kalendertag, markiert nur, löscht nie
+Entscheidung: Kalendertag in Ortszeit, gültig bis einschließlich Ablauftag; abgelaufene Codes werden sichtbar markiert (Text **und** Farbe, durchgestrichen) und vom Fader standardmäßig übersprungen – mit Hinweis und bewusstem Schalter „trotzdem abspielen“. Grund: Ein Code am Ablauftag soll noch nutzbar sein; Ablauf darf nie stillschweigend Daten ändern oder löschen; wer einen abgelaufenen Code bewusst braucht (z. B. Testfall), behält die Kontrolle. Die Kalibrierung ignoriert das Datum.
+
+### ADR-46: Eigenes Austauschformat pro Sammlung, Import immer additiv
+Entscheidung: Teilen nutzt `barq-player-collection` statt des Voll-Backups; Import legt immer neue Sammlungen bzw. zusätzliche Positionen an, Namenskonflikte werden mit „ (2)“ gelöst. Grund: Ein Voll-Backup enthielte Protokolle und Profile und würde beim Wiederherstellen alles ersetzen – für das Weitergeben an andere Personen ungeeignet und riskant. Ein einziger fehlerhafter Code verwirft die ganze Datei mit Positionsangabe (keine Teilimporte aus unvertrauenswürdigen Dateien).
+
+### ADR-47: Teilen per Web Share (Datei), Link ohne Server und Download-Rückfall
+Entscheidung: Dateiteilen versucht `.json`, dann `.txt` (Chrome auf Android erlaubt JSON-Dateien nicht in jeder Version), danach Download; zusätzlich Link (gzip + Base64URL im Hash) und Textliste. Grund: Offline-first und ohne Backend soll das Weitergeben trotzdem ohne Dateiverwaltung möglich sein; der Hash-Teil einer URL wird nie an Server gesendet. Die Oberfläche behauptet nie „gesendet“, wenn nur heruntergeladen oder kopiert wurde.
+
+### ADR-48: Import erkennt Inhalt statt Dateiendung, zweistufig
+Entscheidung: `inspect` (vollständige Prüfung, kein Schreiben) und `commit*` (nach ausdrücklicher Bestätigung). Grund: Geteilte Dateien landen unterwegs als `.txt` oder ohne Endung; der Benutzer soll vor dem Speichern sehen, was passiert (Anzahl, bereits abgelaufene Codes, Fehler mit Zeilennummer).
+
+### ADR-49: Veröffentlichung per GitHub Pages, Tests als Gate
+Entscheidung: Der Workflow `.github/workflows/pages.yml` führt `npm test` und `npm run build` aus und veröffentlicht `dist/` nur bei Erfolg. Grund: Kamera und PWA-Installation brauchen HTTPS; `base: './'` (ADR-30) lässt die App unter dem Unterpfad `/barq-player/` laufen. Fehlgeschlagene Tests verhindern ein fehlerhaftes Update auf den Geräten.
+
+### ADR-50: Installationsknopf und Backup-Erinnerung lokal
+Entscheidung: `beforeinstallprompt` wird abgefangen und als Knopf in den Einstellungen angeboten; `lastBackupAt` liegt in den Bedieneinstellungen (`localStorage`) und löst nach 14 Tagen eine Erinnerung in der Sammlungsliste aus. Grund: Die Daten liegen nur auf dem Gerät (kein Cloud-Konto); im Alltag ist die regelmäßige Sicherung das größte Risiko, und eine Erinnerung ist ehrlicher als eine Automatik, die ohne Cloud nicht existieren kann.

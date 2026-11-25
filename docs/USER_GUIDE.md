@@ -13,7 +13,7 @@ BarQPlayer erfasst Barcodes und QR-Codes im Lager, erzeugt Codes und Zahlenreihe
 6. Der Kassen-Fader
 7. Wenn die Kasse eine Fehlermeldung zeigt
 8. Kassen-Kalibrierung (20er-Test)
-9. Backup (JSON) und CSV-Austausch
+9. Backup, Teilen, Import und CSV-Austausch
 10. Fehlerbehebung
 
 ---
@@ -22,6 +22,10 @@ BarQPlayer erfasst Barcodes und QR-Codes im Lager, erzeugt Codes und Zahlenreihe
 1. Öffnen Sie die Adresse der App in **Chrome** auf dem Android-Telefon (nur über **HTTPS** funktioniert die Kamera).
 2. Tippen Sie auf das Menü (⋮) → **„App installieren“** bzw. **„Zum Startbildschirm hinzufügen“**.
 3. Starten Sie BarQPlayer künftig über das Symbol auf dem Startbildschirm.
+
+**Einfacher:** Unter *Einstellungen → Als App installieren* gibt es – sobald Chrome die Installation anbietet – eine Schaltfläche **App installieren**.
+
+**Woher kommt die Adresse?** Die App wird bei jedem Update des Projekts automatisch über **GitHub Pages** veröffentlicht (Einrichtung einmalig, siehe README). Die Adresse lautet `https://<Benutzername>.github.io/barq-player/`. Öffnen Sie sie am Handy, installieren Sie die App und nutzen Sie sie danach auch ohne Netz.
 
 Beim ersten Start fragt der Browser nach der **Kameraberechtigung** – bitte erlauben. Die App fragt außerdem **persistenten Speicher** an, damit der Browser Ihre Daten nicht automatisch löscht (Status unter *Einstellungen → Speicher*).
 
@@ -47,6 +51,8 @@ Sobald alle Dateien im Gerätespeicher liegen, zeigt die App „**Die App ist je
 
 **Foto-Import:** Wählen Sie ein oder mehrere Fotos. Pro Foto sehen Sie die erkannten Codes und wählen aus, welche übernommen werden. Bilder ohne Code oder nicht lesbare Bilder werden als solche gemeldet. Die Fotos selbst werden **nicht** gespeichert; der Dateiname dient als Bezeichnung.
 
+**Zusatzangaben beim Erfassen:** Unter dem Kamerabild erscheinen die zuletzt erfassten Codes; **Details** daneben öffnet das Formular für Wort, Nutzen, Satz, Tags und Ablaufdatum (Kapitel 4). Bei der manuellen Eingabe können Sie diese Angaben im Aufklapper **Zusatzangaben** einmal ausfüllen; sie gelten für alle Codes dieser Eingabe.
+
 **Manuelle Eingabe und Liste:** Format wählen, Codes einfügen (**eine Zeile = ein Code**), **Prüfen**. Sie sehen „N gültig, M fehlerhaft“ und für jede fehlerhafte Zeile den Grund (z. B. „Zeile 3: Prüfziffer falsch (erwartet 1 …)“). Fehlerhafte Zeilen werden **nie automatisch korrigiert**. Mit **„Nur die N gültigen Zeilen speichern“** übernehmen Sie bewusst nur die gültigen.
 
 **QR-Codes** werden nur als Text gespeichert. Die App **öffnet nie Links** und führt nichts aus; Links, WLAN- und Kontaktdaten werden nur angezeigt, gefährliche Schemata (z. B. `javascript:`) mit Warnung.
@@ -60,6 +66,23 @@ Sobald alle Dateien im Gerätespeicher liegen, zeigt die App „**Die App ist je
   - **Prüfziffer:** mathematisch korrekt (bei EAN)?
   - **Artikelstamm:** bekannt / inaktiv / unbekannt – nur bezogen auf den **importierten Stand** (Tooltip zeigt Quelle und Datum), **nicht** auf den aktuellen Zustand Ihrer Kasse. Ein „bekannter“ Artikel kann an der Kasse trotzdem unbekannt sein und umgekehrt.
 - **Mit Artikelstamm abgleichen** (Artikelstamm unter *Einstellungen* importieren), **CSV exportieren**, **Backup (JSON)**.
+
+### Zusatzangaben und Ablaufdatum
+Jeder Code kann – **wenn Sie möchten** – ergänzt werden. Tippen Sie in der Zeile auf **✎** (Details bearbeiten):
+- **Wort (Bezeichnung)** – z. B. „Bio-Äpfel 1 kg“ (bis 100 Zeichen).
+- **Nutzen** – wofür der Code gedacht ist, z. B. „Kassentest“ (bis 100 Zeichen).
+- **Satz (Notiz)** – ein freier Satz (bis 500 Zeichen).
+- **Tags** – Schlagwörter, mit Komma getrennt (bis 10, je bis 30 Zeichen).
+- **Ablaufdatum** – Datum über den Datumswähler.
+
+Leere Felder bleiben leer; **Leeren** entfernt eine Angabe wieder. Zu lange Texte oder ein ungültiges Datum werden mit einer klaren Meldung abgelehnt und nie stillschweigend gekürzt.
+
+**Abgelaufene Codes:** Ein Code gilt **bis einschließlich** seinem Ablaufdatum und ab dem Folgetag als **abgelaufen**. Er wird dann in der Liste rot als **ABGELAUFEN** markiert (durchgestrichener Wert); Codes, die innerhalb von 7 Tagen ablaufen, erscheinen orange. Über der Tabelle steht, wie viele Positionen betroffen sind. Der **Fader überspringt abgelaufene Codes** und nennt vor dem Start, wie viele übersprungen werden; mit **„Abgelaufene Codes trotzdem abspielen“** spielen Sie sie bewusst ab. Sind *alle* Codes abgelaufen, startet der Fader nicht und sagt das. Das Ablaufdatum **löscht oder verändert nie Daten** – es markiert nur.
+
+**Ablaufdatum für viele Codes:** **„Ablaufdatum für alle setzen“** wirkt auf alle Positionen – oder, wenn Sie gerade suchen/filtern, nur auf die angezeigte Auswahl. Leer lassen entfernt das Datum.
+
+### Suchen und Filtern
+Über der Tabelle: **Suchen** (findet Code, Wort, Nutzen, Satz und Tags, ohne Rücksicht auf Groß-/Kleinschreibung), **Tag-Auswahl** (oder Tippen auf einen Tag in der Zeile) und **„Nur abgelaufene“**.
 
 ## 5. Zahlenreihen und Präfix-Vorlagen (Bereich **Generator**)
 **Einzelcode:** Format und Inhalt eingeben – die Vorschau erscheint sofort. Bei EAN-13/EAN-8 mit 12 bzw. 7 Ziffern können Sie die **Prüfziffer berechnen** lassen (nur auf Ihren Klick). Mit **Zur Sammlung hinzufügen** übernehmen Sie den Code.
@@ -127,8 +150,29 @@ Ziel: Anzeige- und Leerzeit finden, die Ihre Kasse zuverlässig annimmt (*Einste
 
 Die Werte sind **Teststartpunkte, keine Garantie**. Wiederholen Sie wichtige Einstellungen mehrfach und planen Sie Reserve ein. Die mitgelieferten Profile (Langsam, Normaltest, Schnelltest, Identische Codes) sind ebenfalls nur Startpunkte. Die **Leerzeit ist mindestens 20 ms**, damit zwischen zwei Codes sicher ein leeres Bild liegt.
 
-## 9. Backup (JSON) und CSV-Austausch
-**JSON-Backup** (*Einstellungen → Backup herunterladen* oder in einer Sammlung): enthält alles – Sammlungen, Vorlagen, Profile, Artikelstamm, Sitzungsprotokolle. Der Browser-Speicher kann gelöscht werden (auch bei „persistentem Speicher“); sichern Sie regelmäßig.
+## 9. Backup, Teilen, Import und CSV-Austausch
+### Sammlungen mit anderen teilen
+In einer Sammlung (und in der Sammlungsliste über **Teilen**):
+- **Teilen (Datei)** öffnet das Teilen-Menü Ihres Telefons (WhatsApp, E-Mail, Signal, Cloud …) und übergibt eine Datei (`….barq.json`). Bietet Ihr Gerät das Dateiteilen nicht an, wird die Datei **heruntergeladen** (Ordner *Downloads*) und Sie senden sie von dort weiter – die App sagt Ihnen, was passiert ist.
+- **Teilen (Link)** erzeugt einen Link, der den Inhalt **komprimiert in sich trägt** (kein Server, keine Anmeldung). Wer den Link öffnet, sieht zuerst eine Vorschau und importiert erst nach Bestätigung. Sehr große Sammlungen sind für einen Link zu groß – dann die Datei verwenden.
+- **Als Text kopieren** legt eine einfache Liste in die Zwischenablage (Code, Menge, Wort, Ablaufdatum).
+- **CSV exportieren** liefert eine Tabelle mit allen Zusatzangaben.
+
+Die geteilte Datei enthält Name, Codes, Mengen und Zusatzangaben – **keine** Protokolle, Profile oder Artikelstammdaten.
+
+### Importieren (Daten laden)
+**Sammlungen → Importieren** (auch unter *Einstellungen → Sichern, Teilen und Importieren*). Wählen Sie eine Datei **oder** fügen Sie Text bzw. einen App-Link ein. Die App erkennt die Art **am Inhalt** (die Dateiendung spielt keine Rolle):
+- **Geteilte Sammlung** (`.barq.json`/`.txt`, Link) → wird als **neue Sammlung** angelegt.
+- **BarQPlayer-Backup** → die Sammlungen daraus werden als **neue Sammlungen** übernommen (Vorlagen, Profile, Protokolle nicht; zum vollständigen Ersetzen dient *Backup wiederherstellen*).
+- **CSV-Tabelle** → Spalten werden an der Kopfzeile erkannt (deutsch/englisch, z. B. *Code, Format, Menge, Wort, Nutzen, Satz, Tags, Ablaufdatum*). Ohne Format-Spalte wählen Sie das Format.
+- **Einfache Liste** (eine Zeile = ein Code) → Format wählen.
+
+Nach der **Prüfung** sehen Sie eine Zusammenfassung (Anzahl, bereits abgelaufene Codes, Fehler mit Zeilennummer). Erst **Importieren** speichert. **Vorhandene Daten werden nie überschrieben:** Gibt es den Namen schon, heißt die neue Sammlung „Name (2)“. Ein Fehler in einer geteilten Datei verwirft sie komplett; bei CSV/Listen wählen Sie, ob fehlerhafte Zeilen den Import abbrechen oder übersprungen werden. Bereits abgelaufene Codes werden mitimportiert und als abgelaufen markiert.
+
+### Backup
+**JSON-Backup** (*Einstellungen → Backup herunterladen*, **Backup senden / in Cloud speichern** oder in einer Sammlung): enthält alles – Sammlungen, Vorlagen, Profile, Artikelstamm, Sitzungsprotokolle. Der Browser-Speicher kann gelöscht werden (auch bei „persistentem Speicher“); sichern Sie regelmäßig.
+
+Die App merkt sich, wann Sie zuletzt gesichert haben (*Einstellungen*), und erinnert in der Sammlungsliste, wenn die letzte Sicherung **älter als 14 Tage** ist oder es noch keine gibt. Ein sinnvoller Alltag: einmal pro Woche **Backup senden** an sich selbst (E-Mail/Cloud).
 
 **Wiederherstellen** ersetzt **alle** aktuellen Daten. Die Datei wird zuerst **vollständig geprüft**; ist sie fehlerhaft, bleiben Ihre Daten unverändert und die Meldung nennt die Stelle (z. B. `data.items[3].quantity`). Sie müssen den Austausch ausdrücklich bestätigen.
 

@@ -129,7 +129,7 @@ describe('itemsToCsv Round-Trip', () => {
     ];
     const csv = itemsToCsv(items, 'Lager A');
     const lines = csv.split('\r\n');
-    expect(lines[0]).toBe('collection,position,symbology,value,quantity,label,source,syntaxStatus,checksumStatus,catalogStatus');
+    expect(lines[0]).toBe('collection,position,symbology,value,quantity,label,purpose,note,tags,expiresAt,source,syntaxStatus,checksumStatus,catalogStatus');
     expect(lines[1]?.startsWith('Lager A,1,EAN13,0000000000000,1')).toBe(true);
     expect(csv).not.toMatch(/(^|,)=HYPERLINK/m);
     const back = parseItemsCsv(csv);
@@ -173,5 +173,51 @@ describe('parseCatalogCsv', () => {
   it('strukturelle Fehler werfen', () => {
     expect(() => parseCatalogCsv('', meta)).toThrow(AppError);
     expect(() => parseCatalogCsv('foo,bar\n1,2\n', meta)).toThrow(AppError);
+  });
+});
+
+describe('Zusatzangaben in CSV (Wort, Nutzen, Satz, Tags, Ablaufdatum)', () => {
+  const item = (position: number, symbology: BarcodeItem['symbology'], value: string, extra: Partial<BarcodeItem> = {}): BarcodeItem => ({
+    id: `i${position}`,
+    collectionId: 'c',
+    position,
+    symbology,
+    value,
+    quantity: 1,
+    source: 'manual',
+    capturedAt: '2026-01-01T00:00:00.000Z',
+    syntaxStatus: 'valid',
+    checksumStatus: 'valid',
+    catalogStatus: 'unchecked',
+    ...extra
+  });
+
+  it('erkennt deutsche und englische Spaltennamen', () => {
+    expect(suggestCsvMapping(['Code', 'Wort', 'Nutzen', 'Satz', 'Tags', 'Ablaufdatum'])).toEqual({ value: 0, label: 1, purpose: 2, note: 3, tags: 4, expiresAt: 5 });
+    expect(suggestCsvMapping(['value', 'label', 'purpose', 'note', 'tags', 'expiresAt'])).toEqual({ value: 0, label: 1, purpose: 2, note: 3, tags: 4, expiresAt: 5 });
+    expect(suggestCsvMapping(['EAN', 'Gültig bis', 'MHD'])).toEqual({ value: 0, expiresAt: 1 });
+  });
+
+  it('liest Zusatzangaben, normalisiert deutsche Daten und zerlegt Tags', () => {
+    const r = parseItemsCsv('Code;Wort;Nutzen;Satz;Tags;Ablaufdatum\n4006381333931;Apfel;Test;Ein Satz;"Obst, #Aktion";31.12.2026\n', { defaultSymbology: 'EAN13' });
+    expect(r.errors).toEqual([]);
+    expect(r.rows[0]).toMatchObject({ label: 'Apfel', purpose: 'Test', note: 'Ein Satz', tags: ['Obst', 'Aktion'], expiresAt: '2026-12-31' });
+  });
+
+  it('meldet ungültiges Datum und zu lange Texte zeilengenau, ohne die Zeile zu übernehmen', () => {
+    const long = 'x'.repeat(501);
+    const r = parseItemsCsv(`Code,Ablaufdatum,Satz\n4006381333931,2026-02-30,\n5901234123457,2026-12-31,${long}\n9780201379624,2026-12-31,ok\n`, { defaultSymbology: 'EAN13' });
+    expect(r.rows.map((x) => x.value)).toEqual(['9780201379624']);
+    expect(r.errors.map((e) => e.line)).toEqual([2, 3]);
+    expect(r.errors[0]?.message).toContain('Ablaufdatum');
+    expect(r.errors[1]?.message).toContain('Satz');
+  });
+
+  it('Export und Import erhalten alle Angaben; gefährliche Texte werden entschärft und beim Lesen wiederhergestellt', () => {
+    const items = [item(0, 'EAN13', '4006381333931', { label: '=cmd()', purpose: '+Nutzen', note: '@Satz, mit Komma', tags: ['a', 'b'], expiresAt: '2026-12-31' })];
+    const csv = itemsToCsv(items, 'L');
+    expect(csv).not.toMatch(/(^|,)[=+@]/m);
+    const back = parseItemsCsv(csv).rows[0];
+    expect(back).toMatchObject({ label: '=cmd()', purpose: '+Nutzen', note: '@Satz, mit Komma', tags: ['a', 'b'], expiresAt: '2026-12-31' });
   });
 });

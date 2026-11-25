@@ -8,7 +8,8 @@
 import { AppError } from '../domain/errors';
 import { BACKUP_FORMAT, BACKUP_SCHEMA_VERSION, parseBackupText, type BackupFile } from '../domain/backup-schema';
 import { itemsToCsv, parseCatalogCsv, parseItemsCsv, type CsvMapping, type CsvRowError } from '../domain/csv-items';
-import type { Symbology } from '../domain/types';
+import { buildShareFile, itemsToPlainText } from '../domain/share-format';
+import type { Collection, Symbology } from '../domain/types';
 import { guardWrite, type BarqDatabase } from '../adapters/persistence/db';
 import { CollectionService, defaultDeps, type DuplicateRule, type ServiceDeps } from './collection-service';
 
@@ -143,6 +144,37 @@ export class BackupService {
   }
 
   /**
+   * Exportiert eine Sammlung im Austauschformat zum Teilen (JSON, mit allen Zusatzangaben, ohne IDs).
+   * @param collectionId - Sammlung.
+   * @param options - `compact`: ohne Einrückung (kürzer, für Links).
+   * @returns Name und JSON-Text einer geteilten Sammlung.
+   * @throws {AppError} `ERR_NOT_FOUND`.
+   */
+  async exportCollectionShare(collectionId: string, options: { compact?: boolean } = {}): Promise<{ name: string; json: string }> {
+    const collection = await this.requireCollection(collectionId);
+    const items = await this.collections.listItems(collectionId);
+    const file = buildShareFile(collection.name, items, { exportedAt: this.deps.now(), appVersion: this.appVersion });
+    return { name: collection.name, json: options.compact === true ? JSON.stringify(file) : JSON.stringify(file, null, 2) };
+  }
+
+  /**
+   * Exportiert eine Sammlung als einfachen Text (zum Einfügen in Chats, Mails oder Tabellen).
+   * @param collectionId - Sammlung.
+   * @returns Name und Text.
+   * @throws {AppError} `ERR_NOT_FOUND`.
+   */
+  async exportCollectionText(collectionId: string): Promise<{ name: string; text: string }> {
+    const collection = await this.requireCollection(collectionId);
+    return { name: collection.name, text: itemsToPlainText(collection.name, await this.collections.listItems(collectionId)) };
+  }
+
+  private async requireCollection(collectionId: string): Promise<Collection> {
+    const collection = await this.db.collections.get(collectionId);
+    if (!collection) throw new AppError('ERR_NOT_FOUND', { details: `Sammlung ${collectionId}`, userMessage: 'Die Sammlung existiert nicht (mehr).' });
+    return collection;
+  }
+
+  /**
    * Importiert Einträge aus CSV in eine Sammlung (führende Nullen bleiben erhalten, Fehlerbericht pro Zeile).
    * @param collectionId - Zielsammlung.
    * @param text - CSV mit Kopfzeile.
@@ -161,7 +193,17 @@ export class BackupService {
     if (parsed.rows.length === 0) return { imported: 0, aborted: false, errors: parsed.errors };
     await this.collections.addItems(
       collectionId,
-      parsed.rows.map((r) => ({ symbology: r.symbology, value: r.value, quantity: r.quantity, source: 'import' as const, ...(r.label === undefined ? {} : { label: r.label }) })),
+      parsed.rows.map((r) => ({
+        symbology: r.symbology,
+        value: r.value,
+        quantity: r.quantity,
+        source: 'import' as const,
+        label: r.label,
+        purpose: r.purpose,
+        note: r.note,
+        tags: r.tags,
+        expiresAt: r.expiresAt
+      })),
       options.duplicate ?? 'merge'
     );
     return { imported: parsed.rows.length, aborted: false, errors: parsed.errors };

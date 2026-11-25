@@ -12,8 +12,11 @@ import type { Dispose, Route } from '../../app/routes';
 import type { FileScanResult } from '../../adapters/decoder/decoder-adapter';
 import type { CaptureOutcome } from '../../application/capture-service';
 import type { DuplicateRule } from '../../application/collection-service';
+import { formatDateDe } from '../../domain/expiry';
 import { promptDialog } from '../components/dialog';
 import { h, setChildren } from '../components/dom';
+import { editItemDetails } from '../components/item-editor';
+import { metaFields } from '../components/meta-fields';
 
 /** Abstand zwischen zwei Bildauswertungen in ms (ca. 4 Bilder pro Sekunde schonen Akku und Prozessor). */
 export const SCAN_INTERVAL_MS = 250;
@@ -79,12 +82,25 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
   };
 
   const remember = (item: BarcodeItem, merged: boolean): void => {
+    let current = item;
+    const info = h('span', { class: 'recent__qty' }, merged ? `Menge ${item.quantity}` : 'neu gespeichert');
+    const detailsBtn = h('button', { type: 'button', class: 'btn recent__details', 'data-details': item.id, 'aria-label': `Details zu ${item.value} bearbeiten` }, 'Details');
+    detailsBtn.addEventListener('click', () => {
+      void editItemDetails(ctx, current)
+        .then((saved) => {
+          if (!saved) return;
+          current = saved;
+          info.textContent = [saved.label, saved.expiresAt ? `bis ${formatDateDe(saved.expiresAt)}` : '', 'Details gespeichert'].filter((t) => t).join(' · ');
+        })
+        .catch((error: unknown) => ctx.notify.error(error, { source: 'scanner-details' }));
+    });
     const li = h(
       'li',
       { class: 'recent__item' },
       h('span', { class: 'recent__symbology' }, SYMBOLOGY_LABEL[item.symbology]),
       h('code', { class: 'recent__value' }, item.value.length > 80 ? `${item.value.slice(0, 80)}…` : item.value),
-      h('span', { class: 'recent__qty' }, merged ? `Menge ${item.quantity}` : 'neu gespeichert')
+      info,
+      detailsBtn
     );
     recent.prepend(li);
     while (recent.children.length > 8) recent.lastElementChild?.remove();
@@ -276,6 +292,7 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
   const dupSelect = h('select', { id: 'sc-man-dup', class: 'input' }, h('option', { value: 'merge' }, 'Gleiche Codes zusammenfassen (Menge)'), h('option', { value: 'append' }, 'Jede Zeile als eigene Position'));
   const text = h('textarea', { id: 'sc-man-text', class: 'input textarea', rows: 6, placeholder: 'Ein Code pro Zeile', spellcheck: 'false', autocapitalize: 'off', autocomplete: 'off' });
   const manOut = h('div', { class: 'man-out', id: 'sc-man-out', 'aria-live': 'polite' });
+  const manMeta = metaFields('sc-meta');
   let lastParse: BulkParseResult | null = null;
 
   const parse = (): BulkParseResult | null => {
@@ -314,13 +331,14 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
     try {
       const items = await ctx.collections.addItems(
         cid,
-        r.entries.map((e) => ({ symbology: e.symbology, value: e.value, quantity: e.quantity, source: 'manual' as const })),
+        r.entries.map((e) => ({ symbology: e.symbology, value: e.value, quantity: e.quantity, source: 'manual' as const, ...manMeta.read() })),
         dupSelect.value === 'append' ? 'append' : 'merge'
       );
       ctx.feedback.saved();
       const total = r.entries.reduce((n, e) => n + e.quantity, 0);
       ctx.notify.success(`${total} Code(s) gespeichert (${items.length} Position(en)).`);
       text.value = '';
+      manMeta.clear();
       lastParse = null;
       setChildren(manOut);
     } catch (error: unknown) {
@@ -354,7 +372,7 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
       h('div', { class: 'field' }, h('label', { for: 'sc-collection' }, 'Sammlung'), h('div', { class: 'inline' }, collectionSelect, h('button', { type: 'button', class: 'btn', id: 'sc-new', onclick: () => void newCollection() }, 'Neu'))),
       h('details', { open: true, class: 'card' }, h('summary', null, 'Kamera'), h('div', { class: 'camera' }, video, h('div', { class: 'camera__reticle', 'aria-hidden': 'true' })), h('div', { class: 'btn-row' }, camToggle, torchBtn, switchBtn), camStatus, h('fieldset', { class: 'fieldset' }, h('legend', null, 'Freigegebene Formate'), ...FORMAT_ORDER.map((f, i) => h('label', { class: 'check', for: `sc-fmt-${f}` }, formatBoxes[i] as HTMLElement, SYMBOLOGY_LABEL[f])), h('label', { class: 'check', for: 'sc-unique' }, uniqueBox, 'Nur eindeutige Codes erfassen'))),
       h('details', { class: 'card' }, h('summary', null, 'Foto-Import'), h('p', { class: 'hint' }, 'Ein oder mehrere Fotos wählen. Erkannte Codes können einzeln übernommen werden. Die Fotos selbst werden nicht gespeichert.'), h('label', { for: 'sc-files', class: 'sr-only' }, 'Fotos auswählen'), fileInput, importOut),
-      h('details', { class: 'card' }, h('summary', null, 'Manuelle Eingabe und Liste'), h('div', { class: 'field' }, h('label', { for: 'sc-man-sym' }, 'Format'), symSelect), h('div', { class: 'field' }, h('label', { for: 'sc-man-dup' }, 'Gleiche Codes'), dupSelect), h('div', { class: 'field' }, h('label', { for: 'sc-man-text' }, 'Codes (eine Zeile = ein Code)'), text), h('button', { type: 'button', class: 'btn', id: 'sc-man-check', onclick: check }, 'Prüfen'), manOut),
+      h('details', { class: 'card' }, h('summary', null, 'Manuelle Eingabe und Liste'), h('div', { class: 'field' }, h('label', { for: 'sc-man-sym' }, 'Format'), symSelect), h('div', { class: 'field' }, h('label', { for: 'sc-man-dup' }, 'Gleiche Codes'), dupSelect), h('div', { class: 'field' }, h('label', { for: 'sc-man-text' }, 'Codes (eine Zeile = ein Code)'), text), h('details', { class: 'sub-details' }, h('summary', null, 'Zusatzangaben (optional, gelten für alle Codes dieser Eingabe)'), manMeta.element), h('button', { type: 'button', class: 'btn', id: 'sc-man-check', onclick: check }, 'Prüfen'), manOut),
       h('section', { class: 'card', 'aria-labelledby': 'sc-recent-title' }, h('h2', { id: 'sc-recent-title' }, 'Zuletzt erfasst'), recent)
     )
   );

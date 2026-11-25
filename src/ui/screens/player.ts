@@ -79,6 +79,7 @@ function mountSetup(root: HTMLElement, ctx: AppContext, route: Route, calibratio
   const batch = h('input', { id: 'pl-batch', class: 'input', type: 'number', min: 1, max: 100, value: s.batchSize });
   const interleave = h('input', { id: 'pl-interleave', type: 'checkbox', checked: s.interleave });
   const startIndex = h('input', { id: 'pl-start', class: 'input', type: 'number', min: 1, value: 1 });
+  const includeExpired = h('input', { id: 'pl-include-expired', type: 'checkbox' });
   const summary = h('div', { class: 'summary', 'aria-live': 'polite' });
   const startBtn = h('button', { type: 'button', class: 'btn btn--primary btn--big', id: 'pl-start-btn' }, calibration ? 'Kalibrierlauf starten' : 'Start');
   let profiles: FaderProfile[] = [];
@@ -126,13 +127,16 @@ function mountSetup(root: HTMLElement, ctx: AppContext, route: Route, calibratio
         startIndex: calibration ? 0 : Math.max(0, Number(startIndex.value) - 1 || 0),
         viewport: { width: m.width, height: Math.max(1, m.height - PLAYER_BAR_HEIGHT) },
         devicePixelRatio: m.devicePixelRatio,
-        ...(calibration ? { calibration: true } : {})
+        ...(calibration ? { calibration: true } : {}),
+        ...(includeExpired.checked ? { includeExpired: true } : {})
       });
       setChildren(
         summary,
         h('p', null, `${prepared.entries.length} Positionen aus „${prepared.collectionName}“ (${prepared.uniqueSymbols} verschiedene Symbole, alle vorab geprüft).`),
+        prepared.skippedExpired > 0 ? h('p', { class: 'field__error', id: 'pl-skipped-expired' }, `${prepared.skippedExpired} abgelaufene Position(en) wurden übersprungen.`) : null,
         prepared.stats.reordered ? h('p', null, `Smart-Interleaving: ${prepared.stats.avoidedTransitions} identische Übergänge vermieden${prepared.stats.identicalTransitionsAfter > 0 ? `, ${prepared.stats.identicalTransitionsAfter} nicht vermeidbar` : ''}.`) : null
       );
+      if (prepared.skippedExpired > 0) ctx.notify.info(`${prepared.skippedExpired} abgelaufene Position(en) werden übersprungen.`);
       onStart(prepared);
     } catch (error: unknown) {
       ctx.notify.error(error, { source: 'player-prepare' });
@@ -161,7 +165,8 @@ function mountSetup(root: HTMLElement, ctx: AppContext, route: Route, calibratio
             h('div', { class: 'field' }, h('label', { for: 'pl-mode' }, 'Modus'), modeSelect),
             h('div', { class: 'field' }, h('label', { for: 'pl-batch' }, 'Kleinstapel: Codes bis zur Bestätigung'), batch),
             h('div', { class: 'field field--check' }, interleave, h('label', { for: 'pl-interleave' }, 'Smart-Interleaving (identische Codes nicht direkt hintereinander)')),
-            h('div', { class: 'field' }, h('label', { for: 'pl-start' }, 'Ab Position'), startIndex)
+            h('div', { class: 'field' }, h('label', { for: 'pl-start' }, 'Ab Position'), startIndex),
+            h('div', { class: 'field field--check' }, includeExpired, h('label', { for: 'pl-include-expired' }, 'Abgelaufene Codes trotzdem abspielen (Standard: überspringen)'))
           ),
       summary,
       startBtn

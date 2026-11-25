@@ -10,7 +10,9 @@ import type { AppContext } from '../../app/container';
 import type { Dispose, Route } from '../../app/routes';
 import type { CsvImportReport } from '../../application/backup-service';
 import { confirmDialog } from '../components/dialog';
-import { downloadText, formatDateTime, h, setChildren } from '../components/dom';
+import { formatDateTime, h, setChildren } from '../components/dom';
+import { openImportDialog } from '../components/import-dialog';
+import { downloadBackup, shareBackup } from '../components/share-actions';
 
 /** Liest eine Textdatei (Standard: `File.text()`). */
 function readText(file: Blob): Promise<string> {
@@ -177,6 +179,37 @@ export function mountSettings(root: HTMLElement, ctx: AppContext, _route: Route)
   };
 
   // ------------------------------------------------------------------ Backup
+  const backupInfo = h('p', { class: 'hint', id: 'st-backup-info' });
+  const renderBackupInfo = (): void => {
+    const last = ctx.settings.get().lastBackupAt;
+    backupInfo.textContent = last === null ? 'Noch keine Sicherung erstellt. Sichern Sie regelmäßig, denn die Daten liegen nur auf diesem Gerät.' : `Letzte Sicherung: ${formatDateTime(last)}.`;
+  };
+
+  // ------------------------------------------------------------------ Installation
+  const installInfo = h('p', { class: 'hint', id: 'st-install-info' });
+  const installBtn = h('button', { type: 'button', class: 'btn btn--primary', id: 'st-install', hidden: true }, 'App installieren');
+  const renderInstall = (): void => {
+    const state = ctx.install.state;
+    installBtn.hidden = state !== 'available';
+    installInfo.textContent =
+      state === 'installed'
+        ? 'Die App ist installiert und startet wie jede andere App vom Startbildschirm.'
+        : state === 'available'
+          ? 'Installieren Sie BarQPlayer auf dem Startbildschirm. Danach läuft sie im Vollbild und ohne Netz.'
+          : 'Öffnen Sie in Chrome das Menü (⋮) und wählen Sie „App installieren“ bzw. „Zum Startbildschirm hinzufügen“.';
+  };
+  installBtn.addEventListener('click', () => {
+    void ctx.install
+      .prompt()
+      .then((r) => {
+        if (r === 'accepted') ctx.notify.success('Die App wird installiert.');
+      })
+      .catch(fail('settings-install'));
+  });
+  const unsubInstall = ctx.install.subscribe(() => {
+    if (alive) renderInstall();
+  });
+
   const restoreOut = h('div', { id: 'st-restore-out', 'aria-live': 'polite' });
   const restoreFile = h('input', { type: 'file', id: 'st-restore-file', accept: '.json,application/json', class: 'input' });
   restoreFile.addEventListener('change', () => {
@@ -279,7 +312,26 @@ export function mountSettings(root: HTMLElement, ctx: AppContext, _route: Route)
       h('section', { class: 'card', 'aria-labelledby': 'st-cal-title' }, h('h2', { id: 'st-cal-title' }, 'Kassen-Kalibrierung'), h('p', { class: 'hint' }, '20 Testcodes anzeigen und das Ergebnis an der Kasse eintragen. Daraus wird ein Profil vorgeschlagen.'), h('button', { type: 'button', class: 'btn', id: 'st-calibrate', onclick: () => ctx.navigate({ name: 'player', params: { calibration: '1' } }) }, '20er-Kalibrierung starten')),
       h('section', { class: 'card', 'aria-labelledby': 'st-cat-title' }, h('h2', { id: 'st-cat-title' }, 'Artikelstamm (CSV)'), catalogInfo, h('p', { class: 'hint' }, 'Spalten z. B. „EAN“, „Aktiv“, „Bezeichnung“. Die Aussage „bekannt/unbekannt“ gilt nur für den importierten Stand, nicht für den aktuellen Zustand der Kasse.'), h('label', { class: 'check', for: 'st-catalog-skip' }, catalogSkip, 'Fehlerhafte Zeilen überspringen (sonst Abbruch)'), h('label', { for: 'st-catalog-file', class: 'sr-only' }, 'CSV-Datei wählen'), catalogFile, catalogOut),
       h('section', { class: 'card', 'aria-labelledby': 'st-store-title' }, h('h2', { id: 'st-store-title' }, 'Speicher'), h('button', { type: 'button', class: 'btn', id: 'st-storage-btn', onclick: checkStorage }, 'Persistenten Speicher anfragen / Status'), storageOut),
-      h('section', { class: 'card', 'aria-labelledby': 'st-bak-title' }, h('h2', { id: 'st-bak-title' }, 'Backup'), h('button', { type: 'button', class: 'btn btn--primary', id: 'st-backup', onclick: () => void ctx.backup.exportJson().then((json) => downloadText(`barqplayer-backup-${ctx.nowIso().slice(0, 10)}.json`, json, 'application/json')).catch(fail('settings-backup')) }, 'Backup herunterladen (JSON)'), h('p', { class: 'hint' }, 'Wiederherstellen ersetzt alle Daten. Die Datei wird vollständig vorab geprüft.'), h('label', { for: 'st-restore-file', class: 'sr-only' }, 'Backup-Datei wählen'), restoreFile, restoreOut),
+      h(
+        'section',
+        { class: 'card', 'aria-labelledby': 'st-bak-title' },
+        h('h2', { id: 'st-bak-title' }, 'Sichern, Teilen und Importieren'),
+        backupInfo,
+        h(
+          'div',
+          { class: 'btn-row' },
+          h('button', { type: 'button', class: 'btn btn--primary', id: 'st-backup', onclick: () => void downloadBackup(ctx).then(renderBackupInfo) }, 'Backup herunterladen (JSON)'),
+          h('button', { type: 'button', class: 'btn', id: 'st-backup-share', onclick: () => void shareBackup(ctx).then(renderBackupInfo) }, 'Backup senden / in Cloud speichern'),
+          h('button', { type: 'button', class: 'btn', id: 'st-import', onclick: () => void openImportDialog(ctx).then(() => Promise.all([loadProfiles(), refreshCatalogInfo()])) }, 'Datei, Liste oder Link importieren')
+        ),
+        h('p', { class: 'hint' }, 'Das Backup enthält alle Sammlungen, Vorlagen, Profile, Artikelstamm und Protokolle. Einzelne Sammlungen teilen Sie unter „Sammlungen“.'),
+        h('h3', null, 'Backup wiederherstellen'),
+        h('p', { class: 'hint' }, 'Wiederherstellen ersetzt alle Daten. Die Datei wird vollständig vorab geprüft.'),
+        h('label', { for: 'st-restore-file', class: 'sr-only' }, 'Backup-Datei wählen'),
+        restoreFile,
+        restoreOut
+      ),
+      h('section', { class: 'card', 'aria-labelledby': 'st-inst-title' }, h('h2', { id: 'st-inst-title' }, 'Als App installieren'), installInfo, installBtn),
       h('section', { class: 'card', 'aria-labelledby': 'st-fb-title' }, h('h2', { id: 'st-fb-title' }, 'Rückmeldung beim Scannen'), h('label', { class: 'check', for: 'st-sound' }, soundBox, 'Piepton nach erfolgreichem Speichern'), h('label', { class: 'check', for: 'st-vibration' }, vibrationBox, 'Vibration nach erfolgreichem Speichern')),
       h('section', { class: 'card', 'aria-labelledby': 'st-lift-title' }, h('h2', { id: 'st-lift-title' }, 'Lift-to-Pause (experimentell)'), h('label', { class: 'check', for: 'st-lift' }, liftBox, 'Beim Anheben des Telefons pausieren'), liftInfo),
       h('section', { class: 'card', 'aria-labelledby': 'st-diag-title' }, h('h2', { id: 'st-diag-title' }, 'Diagnose'), h('p', { class: 'hint' }, `App-Version ${ctx.appVersion}. Das Protokoll enthält keine Barcode-Inhalte.`), decoderInfo, updateInfo, logBox, h('button', { type: 'button', class: 'btn', id: 'st-log-clear', onclick: () => { ctx.logger.clear(); renderLog(); } }, 'Protokoll leeren'))
@@ -289,9 +341,12 @@ export function mountSettings(root: HTMLElement, ctx: AppContext, _route: Route)
   void refreshCatalogInfo();
   renderLog();
   renderUpdate();
+  renderBackupInfo();
+  renderInstall();
   return () => {
     alive = false;
     unsub();
     unsubUpdates();
+    unsubInstall();
   };
 }

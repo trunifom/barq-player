@@ -26,6 +26,24 @@ export interface PromptOptions {
 
 let dialogCounter = 0;
 
+/** Ergebnis des Aufbaus eines eigenen Dialogs. */
+export interface DialogBuild<T> {
+  dialog: HTMLElement;
+  /** Element, das beim Öffnen den Fokus erhält. */
+  focus: HTMLElement;
+  /** Ergebnis bei Abbruch (Escape). */
+  cancelValue: T;
+}
+
+/**
+ * Öffnet einen eigenen modalen Dialog mit Fokusverwaltung und Escape-Abbruch.
+ * @param build - baut den Dialog; erhält die Schließfunktion und die ID für `aria-labelledby`.
+ * @returns Wert, mit dem der Dialog geschlossen wurde.
+ */
+export function openDialog<T>(build: (close: (value: T) => void, titleId: string) => DialogBuild<T>): Promise<T> {
+  return open(build);
+}
+
 function open<T>(build: (close: (value: T) => void, titleId: string) => { dialog: HTMLElement; focus: HTMLElement; cancelValue: T }): Promise<T> {
   return new Promise<T>((resolve) => {
     const previous = document.activeElement as HTMLElement | null;
@@ -110,5 +128,58 @@ export function promptDialog(options: PromptOptions): Promise<string | null> {
       h('div', { class: 'dialog__actions' }, h('button', { type: 'button', class: 'btn', onclick: () => close(null) }, 'Abbrechen'), h('button', { type: 'button', class: 'btn btn--primary', onclick: submit }, options.confirmLabel ?? 'OK'))
     );
     return { dialog, focus: input, cancelValue: null };
+  });
+}
+
+/** Optionen eines Formulardialogs. */
+export interface FormDialogOptions {
+  title: string;
+  /** Formularinhalt (Felder). */
+  body: Node;
+  confirmLabel?: string;
+  /** Element mit Starfokus. */
+  focus?: HTMLElement;
+  /**
+   * Wird beim Bestätigen aufgerufen. Liefert eine Fehlermeldung (Dialog bleibt offen) oder `null` (Dialog schließt, Ergebnis `true`).
+   * Eine geworfene Ausnahme wird als Meldung angezeigt, damit der Dialog nie hängen bleibt.
+   */
+  onSubmit: () => Promise<string | null> | string | null;
+}
+
+/**
+ * Zeigt einen Dialog mit frei gestalteten Feldern und Prüfung beim Bestätigen.
+ * @param options - Titel, Felder und Prüfroutine.
+ * @returns `true`, wenn bestätigt und gespeichert wurde, sonst `false`.
+ */
+export function formDialog(options: FormDialogOptions): Promise<boolean> {
+  return open<boolean>((close, titleId) => {
+    const error = h('p', { class: 'field__error', role: 'alert', id: `${titleId}-err` });
+    const ok = h('button', { type: 'button', class: 'btn btn--primary', 'data-dialog-ok': true }, options.confirmLabel ?? 'Speichern');
+    ok.addEventListener('click', () => {
+      ok.disabled = true;
+      error.textContent = '';
+      void (async () => {
+        try {
+          const problem = await options.onSubmit();
+          if (problem === null) {
+            close(true);
+            return;
+          }
+          error.textContent = problem;
+        } catch (e: unknown) {
+          error.textContent = e instanceof Error && e.message !== '' ? e.message : 'Das Speichern ist fehlgeschlagen.';
+        }
+        ok.disabled = false;
+      })();
+    });
+    const cancel = h('button', { type: 'button', class: 'btn', onclick: () => close(false) }, 'Abbrechen');
+    const dialog = h(
+      'div',
+      { class: 'dialog dialog--form', role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': titleId },
+      h('h2', { id: titleId }, options.title),
+      h('div', { class: 'dialog__body' }, options.body, error),
+      h('div', { class: 'dialog__actions' }, cancel, ok)
+    );
+    return { dialog, focus: options.focus ?? ok, cancelValue: false };
   });
 }

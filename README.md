@@ -18,11 +18,22 @@ Alle Meilensteine sind umgesetzt (Details und Nachweise je Anforderung in [`docs
 | M5 | Kamera, Hybrid-Decoder (nativ → zxing-wasm, lokales WASM), Capture-Service, Foto-Import | ✅ |
 | M6 | Mobile-First-UI (Scanner, Sammlungen, Generator, Fader, Einstellungen), 20er-Kalibrierung, globale Fehler-/Hintergrund-Absicherung | ✅ |
 | M7 | Offline-Härtung (Service Worker, Update-Policy, Icons), Lift-to-Pause, Endabnahme | ✅ |
+| M8 | Alltagstauglichkeit (Version 0.2.0): Zusatzangaben je Code (Wort, Nutzen, Satz, Tags, Ablaufdatum), Ablauf-Markierung, Suche/Filter, Teilen (Datei, Link, Text), vollständiger Import (geteilte Sammlung, Backup, CSV, Liste, Link), Installationsknopf, Backup-Erinnerung, Veröffentlichung per GitHub Pages | ✅ |
 
 **Noch nicht Teil von Version 1** (Spezifikation 9.3): Frontkamera-/Mikrofon-Rückkanal, Kassenschnittstelle, Synchronisierung. Die Stellenbedeutung des Nummernbereichs `2063701…` und die tatsächlichen Scanner-/Kassenzeiten müssen an der realen Hardware geklärt werden (Kalibrierung).
 
 ## Tech-Stack
 TypeScript (strict), Vite, vite-plugin-pwa (Service Worker, Precache), Dexie (IndexedDB), bwip-js (Modulmuster), zxing-wasm über `barcode-detector` (lokales WASM), Vitest (jsdom, fake-indexeddb). Keine UI-Frameworks, keine externen Dienste zur Laufzeit.
+
+## Im Alltag auf dem Smartphone nutzen (einmalig einrichten)
+Kamera und App-Installation funktionieren nur über **HTTPS**. Der mitgelieferte Workflow [`.github/workflows/pages.yml`](.github/workflows/pages.yml) testet die App bei jedem Push auf `main`, baut sie und veröffentlicht sie über **GitHub Pages**:
+
+1. Änderungen pushen (`git push -u origin main`).
+2. Im GitHub-Repository: **Settings → Pages → Build and deployment → Source: „GitHub Actions“**.
+3. Unter **Actions** den Lauf „Veröffentlichen (GitHub Pages)“ abwarten (grüner Haken). Die Adresse steht im Lauf und lautet `https://<Benutzername>.github.io/barq-player/`.
+4. Diese Adresse am Handy in **Chrome** öffnen, kurz mit Netz warten („Die App ist jetzt offline nutzbar“) und dann **Einstellungen → App installieren** (oder Chrome-Menü ⋮ → *App installieren*).
+
+Danach startet BarQPlayer wie jede App vom Startbildschirm, auch ohne Netz. Updates erscheinen als Hinweis und werden nie mitten in einer Fader-Sitzung aktiviert. Alle Daten bleiben auf dem Gerät – sichern Sie regelmäßig (*Einstellungen → Backup senden*), die App erinnert nach 14 Tagen.
 
 ## Setup
 ```bash

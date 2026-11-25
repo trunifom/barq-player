@@ -15,6 +15,8 @@ import { WakeLockManager, type WakeLockApi } from '../adapters/wakelock/wake-loc
 import { BackupService } from '../application/backup-service';
 import { CaptureService } from '../application/capture-service';
 import { CollectionService } from '../application/collection-service';
+import { ImportService } from '../application/import-service';
+import { InstallPrompt } from '../offline/install-prompt';
 import { PlaybackController } from '../application/playback-service';
 import { SessionService } from '../application/session-service';
 import { SettingsStore, type KeyValueStorage } from '../application/settings-store';
@@ -42,6 +44,10 @@ export interface AppContext {
   readonly lift: LiftDetector;
   /** Update-Policy (neue Version nie mitten in einer Sitzung aktivieren). */
   readonly updates: UpdatePolicy;
+  /** Installation als App (Knopf in den Einstellungen). */
+  readonly install: InstallPrompt;
+  /** Import aus Dateien, Text und Links. */
+  readonly importer: ImportService;
   /** Browser-Speicherverwaltung (`navigator.storage`), falls vorhanden. */
   readonly storageManager: StorageManagerLike | undefined;
   /** Aktueller Decoder (wird bei geänderter Format-Whitelist ersetzt). */
@@ -149,6 +155,14 @@ export function createAppContext(env: AppEnvironment): AppContext {
     ...(o.liftTimers ? { timers: o.liftTimers } : {})
   });
   const updates = new UpdatePolicy({ isSessionLive: () => playback.isLive });
+  const install = new InstallPrompt(env.win, () => {
+    try {
+      return env.win.matchMedia?.('(display-mode: standalone)').matches === true;
+    } catch {
+      return false; // matchMedia nicht verfügbar → als nicht installiert behandeln
+    }
+  });
+  const importer = new ImportService(db, APP_VERSION, deps);
 
   let decoder: HybridDecoder;
   let capture: CaptureService;
@@ -176,6 +190,8 @@ export function createAppContext(env: AppEnvironment): AppContext {
     renderCache,
     lift,
     updates,
+    install,
+    importer,
     storageManager: 'storageManager' in o ? o.storageManager : (env.win.navigator as { storage?: StorageManagerLike }).storage,
     getDecoder: () => decoder,
     getCapture: () => capture,

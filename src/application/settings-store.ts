@@ -27,6 +27,8 @@ export interface AppSettings {
   vibration: boolean;
   /** Lift-to-Pause-Sensor (Meilenstein 7) zuschalten. */
   liftToPause: boolean;
+  /** Zeitpunkt der letzten Sicherung (ISO) oder `null` (für die Erinnerung an regelmäßige Backups). */
+  lastBackupAt: string | null;
 }
 
 /** Alle wählbaren Formate in fester Reihenfolge. */
@@ -43,7 +45,8 @@ export const DEFAULT_SETTINGS: Readonly<AppSettings> = Object.freeze({
   formats: [...DEFAULT_WHITELIST],
   sound: true,
   vibration: true,
-  liftToPause: false
+  liftToPause: false,
+  lastBackupAt: null
 });
 
 /** Minimale Speicherschnittstelle. */
@@ -84,7 +87,8 @@ export function sanitizeSettings(raw: unknown): AppSettings {
     formats: sanitizeFormats(r['formats'], d.formats),
     sound: bool(r['sound'], d.sound),
     vibration: bool(r['vibration'], d.vibration),
-    liftToPause: bool(r['liftToPause'], d.liftToPause)
+    liftToPause: bool(r['liftToPause'], d.liftToPause),
+    lastBackupAt: typeof r['lastBackupAt'] === 'string' && !Number.isNaN(new Date(r['lastBackupAt']).getTime()) ? r['lastBackupAt'] : null
   };
 }
 

@@ -10,6 +10,7 @@
  * - Eine Anzeige ist nie eine Kassenbuchung: Es werden nur `displayed`, `blanked`, `paused`, `manual-confirmed`, `uncertain` erzeugt.
  */
 import { AppError } from '../domain/errors';
+import { localDateString, partitionByExpiry } from '../domain/expiry';
 import { validateProfile } from '../domain/profiles';
 import { buildCalibrationEntries, buildPlaybackEntries, entryKey, interleaveEntries } from '../domain/playback-entries';
 import { PlaybackMachine, type PauseSource, type PlaybackMode, type PlaybackSnapshot, type Scheduler } from '../domain/playback-machine';
@@ -36,6 +37,8 @@ export interface PlaybackRequest {
   devicePixelRatio: number;
   /** Kalibrierungslauf: genau 20 Testpositionen, Modus Automatik, kein Interleaving. */
   calibration?: boolean;
+  /** `true`: abgelaufene Codes trotzdem abspielen (Standard: überspringen). */
+  includeExpired?: boolean;
 }
 
 /** Vorbereitete (noch nicht gestartete) Sitzung. */
@@ -46,6 +49,8 @@ export interface PreparedPlayback {
   stats: InterleaveStats;
   /** Anzahl unterschiedlicher Symbole (so viele wurden vorab gerendert). */
   uniqueSymbols: number;
+  /** Anzahl wegen abgelaufenem Ablaufdatum übersprungener Positionen (nicht Stückzahl). */
+  skippedExpired: number;
 }
 
 /** Laufende Sitzung. */
@@ -102,7 +107,21 @@ export class PlaybackController {
     }
     const collection = (await this.deps.collections.listCollections()).find((c) => c.id === request.collectionId);
     if (!collection) throw new AppError('ERR_NOT_FOUND', { details: `Sammlung ${request.collectionId}`, userMessage: 'Die Sammlung existiert nicht (mehr).' });
-    const items = await this.deps.collections.listItems(request.collectionId);
+    const allItems = await this.deps.collections.listItems(request.collectionId);
+    let items = allItems;
+    let skippedExpired = 0;
+    if (request.calibration !== true && request.includeExpired !== true) {
+      const today = localDateString(new Date(this.deps.nowIso()));
+      const split = partitionByExpiry(allItems, today);
+      items = split.valid;
+      skippedExpired = split.expired.length;
+      if (items.length === 0 && skippedExpired > 0) {
+        throw new AppError('ERR_PLAYBACK_FAILED', {
+          details: `alle ${skippedExpired} Positionen abgelaufen`,
+          userMessage: `Alle ${skippedExpired} Codes dieser Sammlung sind abgelaufen. Aktualisieren Sie die Ablaufdaten oder spielen Sie abgelaufene Codes bewusst trotzdem ab.`
+        });
+      }
+    }
     let entries: PlaybackEntry[];
     let stats: InterleaveStats;
     if (request.calibration === true) {
@@ -129,7 +148,7 @@ export class PlaybackController {
         throw new AppError(base.code, { details: `Position ${i + 1}: ${base.details ?? base.message}`, cause: base, userMessage: `Position ${i + 1}: ${base.userMessage}` });
       }
     });
-    return { request, collectionName: collection.name, entries, stats, uniqueSymbols: seen.size };
+    return { request, collectionName: collection.name, entries, stats, uniqueSymbols: seen.size, skippedExpired };
   }
 
   /**

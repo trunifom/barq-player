@@ -7,6 +7,8 @@
 import { AppError } from '../domain/errors';
 import { validateCodeValue } from '../domain/bulk-parser';
 import { MAX_QUANTITY } from '../domain/csv-items';
+import { fillMissingMeta, normalizeItemMeta, type ItemMeta, type ItemMetaInput } from '../domain/item-meta';
+import type { ShareFile } from '../domain/share-format';
 import { DEFAULT_PROFILES, validateProfile } from '../domain/profiles';
 import type {
   BarcodeItem,
@@ -38,7 +40,22 @@ export interface NewItemInput {
   value: string;
   source: ItemSource;
   quantity?: number;
-  label?: string;
+  /** Wort / Bezeichnung. */
+  label?: string | undefined;
+  /** Nutzen. */
+  purpose?: string | undefined;
+  /** Satz / Notiz. */
+  note?: string | undefined;
+  /** Tags (Liste oder Text mit Trennzeichen). */
+  tags?: readonly string[] | string | undefined;
+  /** Ablaufdatum (`JJJJ-MM-TT` oder `TT.MM.JJJJ`). */
+  expiresAt?: string | undefined;
+}
+
+/** Ergebnis des Imports einer geteilten Sammlung. */
+export interface ShareImportResult {
+  collection: Collection;
+  items: number;
 }
 
 /** Duplikatregel beim Hinzufügen: `merge` erhöht die Menge, `append` legt eine neue Position an. */
@@ -168,8 +185,14 @@ export class CollectionService {
       if (!check.ok) {
         throw new AppError(check.code, { details: `Eintrag ${i + 1}: ${check.message}`, userMessage: `Eintrag ${i + 1}: ${check.message}` });
       }
-      const label = input.label?.trim();
-      return { input, value: check.value, checksum: check.checksum, quantity: checkQuantity(input.quantity ?? 1), label: label === '' ? undefined : label };
+      let meta: ItemMeta;
+      try {
+        meta = normalizeItemMeta({ label: input.label, purpose: input.purpose, note: input.note, tags: input.tags, expiresAt: input.expiresAt });
+      } catch (error: unknown) {
+        const message = `Eintrag ${i + 1}: ${error instanceof AppError ? error.userMessage : 'ungültige Zusatzangaben'}`;
+        throw new AppError('ERR_SYNTAX_INVALID', { details: message, cause: error, userMessage: message });
+      }
+      return { input, value: check.value, checksum: check.checksum, quantity: checkQuantity(input.quantity ?? 1), meta };
     });
 
     return guardWrite(() =>
@@ -190,7 +213,7 @@ export class CollectionService {
           const key = `${p.input.symbology}\u0000${p.value}`;
           const found = rule === 'merge' ? byKey.get(key) : undefined;
           if (found) {
-            const merged: BarcodeItem = { ...found, quantity: checkQuantity(found.quantity + p.quantity) };
+            const merged: BarcodeItem = { ...found, ...fillMissingMeta(found, p.meta), quantity: checkQuantity(found.quantity + p.quantity) };
             byKey.set(key, merged);
             touched.set(merged.id, merged);
             result.push(merged);
@@ -207,7 +230,7 @@ export class CollectionService {
               syntaxStatus: 'valid',
               checksumStatus: p.checksum,
               catalogStatus: 'unchecked',
-              ...(p.label === undefined ? {} : { label: p.label })
+              ...p.meta
             };
             if (rule === 'merge') byKey.set(key, item);
             touched.set(item.id, item);
@@ -323,6 +346,100 @@ export class CollectionService {
         await this.touchCollection(item.collectionId);
       })
     );
+  }
+
+  /**
+   * Ersetzt die Zusatzangaben (Wort, Nutzen, Satz, Tags, Ablaufdatum) eines Eintrags vollständig:
+   * nicht angegebene Felder werden entfernt. Wert, Format und Menge bleiben unverändert.
+   * @param itemId - Eintrags-ID.
+   * @param input - neue Angaben (leer = entfernen).
+   * @returns aktualisierter Eintrag.
+   * @throws {AppError} `ERR_NOT_FOUND`, `ERR_SYNTAX_INVALID` (zu lang, ungültiges Datum), `ERR_STORAGE_*`.
+   */
+  async updateItemMeta(itemId: string, input: ItemMetaInput): Promise<BarcodeItem> {
+    const meta = normalizeItemMeta(input);
+    return guardWrite(() =>
+      this.db.transaction('rw', this.db.collections, this.db.items, async () => {
+        const item = await this.requireItem(itemId);
+        const updated: BarcodeItem = { ...item };
+        delete updated.label;
+        delete updated.purpose;
+        delete updated.note;
+        delete updated.tags;
+        delete updated.expiresAt;
+        Object.assign(updated, meta);
+        await this.db.items.put(updated);
+        await this.touchCollection(item.collectionId);
+        return updated;
+      })
+    );
+  }
+
+  /**
+   * Setzt oder löscht das Ablaufdatum mehrerer Einträge gleichzeitig (atomar).
+   * @param itemIds - betroffene Einträge.
+   * @param expiresAt - Datum (`JJJJ-MM-TT` oder `TT.MM.JJJJ`) oder `null`, um das Datum zu entfernen.
+   * @returns Anzahl geänderter Einträge.
+   * @throws {AppError} `ERR_SYNTAX_INVALID` bei ungültigem Datum, `ERR_STORAGE_*`.
+   */
+  async setExpiry(itemIds: readonly string[], expiresAt: string | null): Promise<number> {
+    const date = expiresAt === null ? undefined : normalizeItemMeta({ expiresAt }).expiresAt;
+    if (expiresAt !== null && date === undefined) throw badInput('Bitte ein Datum angeben.');
+    if (itemIds.length === 0) return 0;
+    return guardWrite(() =>
+      this.db.transaction('rw', this.db.collections, this.db.items, async () => {
+        const items = (await this.db.items.bulkGet([...itemIds])).filter((i): i is BarcodeItem => i !== undefined);
+        const updated = items.map((item) => {
+          const next: BarcodeItem = { ...item };
+          if (date === undefined) delete next.expiresAt;
+          else next.expiresAt = date;
+          return next;
+        });
+        await this.db.items.bulkPut(updated);
+        for (const id of new Set(updated.map((i) => i.collectionId))) await this.touchCollection(id);
+        return updated.length;
+      })
+    );
+  }
+
+  /**
+   * Liefert einen noch nicht vergebenen Sammlungsnamen (`Name`, `Name (2)`, `Name (3)` …).
+   * @param wanted - Wunschname.
+   * @returns freier Name innerhalb der 100-Zeichen-Grenze.
+   */
+  async uniqueCollectionName(wanted: string): Promise<string> {
+    const base = cleanName(wanted);
+    const used = new Set((await this.db.collections.toArray()).map((c) => c.name.toLocaleLowerCase('de')));
+    if (!used.has(base.toLocaleLowerCase('de'))) return base;
+    for (let n = 2; n < 1000; n++) {
+      const suffix = ` (${n})`;
+      const candidate = `${base.slice(0, MAX_NAME_LENGTH - suffix.length)}${suffix}`;
+      if (!used.has(candidate.toLocaleLowerCase('de'))) return candidate;
+    }
+    throw badInput('Es konnte kein freier Sammlungsname gefunden werden.');
+  }
+
+  /**
+   * Importiert eine geteilte Sammlung als NEUE Sammlung (vorhandene Daten bleiben unberührt; bei Namensgleichheit
+   * wird ` (2)` angehängt). Scheitert das Speichern der Codes, wird die neue Sammlung wieder entfernt.
+   * @param file - geprüfte Austauschdatei.
+   * @returns neue Sammlung und Anzahl Codes.
+   * @throws {AppError} `ERR_SYNTAX_INVALID`/`ERR_CHECKSUM_INVALID` (kann bei geprüften Dateien nicht vorkommen), `ERR_STORAGE_*`.
+   */
+  async importShare(file: ShareFile): Promise<ShareImportResult> {
+    const collection = await this.createCollection(await this.uniqueCollectionName(file.collection.name));
+    try {
+      await this.addItems(
+        collection.id,
+        file.items.map((i) => ({ ...i, source: 'import' as const })),
+        'append'
+      );
+    } catch (error: unknown) {
+      // Aufräumen: keine halb importierte Sammlung zurücklassen; der ursprüngliche Fehler bleibt maßgeblich.
+      await this.deleteCollection(collection.id).catch(() => undefined);
+      throw error;
+    }
+    return { collection, items: file.items.length };
   }
 
   // ------------------------------------------------------------ Artikelstamm
