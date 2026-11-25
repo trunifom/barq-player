@@ -44,6 +44,12 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | Q-05 | `navigator.storage.persist()` + Speicheranzeige | Umgesetzt | 2026-11-24 | 21:44:10 | #004 `0e03130` | `persistence/db.ts` | `persistence.test.ts` |
 | Q-06 | Update-Policy: kein Reload in aktiver Sitzung | Umgesetzt | 2026-11-24 | 22:54:53 | #008 `51bcd32` | `src/offline/` | `offline-update.test.ts`, `lift-and-update.test.ts`, `production-build.test.ts` |
 | Q-07 | PWA-Icons + Manifest | Umgesetzt | 2026-11-24 | 22:54:53 | #008 `51bcd32` | `public/icons/` | `production-build.test.ts` (Manifest, Icons) |
+| F-16 | Zusatzangaben je Code: Wort, Nutzen, Satz, Tags (optional, streng geprüft) | Umgesetzt | 2026-11-25 | 08:36:18 | #009 `ee17d5f` | `domain/item-meta.ts`, `application/collection-service.ts`, `ui/components/{meta-fields,item-editor}.ts`, `ui/screens/{collections,scanner}.ts` | `item-meta.test.ts`, `meta-share-import.test.ts`, `meta-share.test.ts` |
+| F-17 | Ablaufdatum: Markierung „ABGELAUFEN“, Warnung 7 Tage, Fader überspringt abgelaufene Codes | Umgesetzt | 2026-11-25 | 08:36:18 | #009 `ee17d5f` | `domain/expiry.ts`, `application/playback-service.ts`, `ui/components/badges.ts`, `ui/screens/{collections,player}.ts` | `expiry.test.ts`, `meta-share-import.test.ts`, `meta-share.test.ts` |
+| F-18 | Teilen von Sammlungen: Datei (Web Share/Download), Link ohne Server, Textliste, CSV | Umgesetzt | 2026-11-25 | 08:36:18 | #009 `ee17d5f` | `domain/share-format.ts`, `adapters/share/*`, `ui/components/share-actions.ts` | `share-format.test.ts`, `link-codec.test.ts`, `share-adapter.test.ts`, `meta-share.test.ts` |
+| F-19 | Vollständiger Import: geteilte Sammlung, Backup, CSV, Liste, Link (zweistufig, additiv) | Umgesetzt | 2026-11-25 | 08:36:18 | #009 `ee17d5f` | `application/import-service.ts`, `ui/components/import-dialog.ts`, `domain/csv-items.ts` | `meta-share-import.test.ts`, `csv-items.test.ts`, `meta-share.test.ts` |
+| F-20 | Suchen und Filtern (Text, Tag, nur abgelaufene), Ablaufdatum für viele Codes setzen | Umgesetzt | 2026-11-25 | 08:36:18 | #009 `ee17d5f` | `ui/screens/collections.ts`, `domain/item-meta.ts`, `application/collection-service.ts` | `item-meta.test.ts`, `meta-share-import.test.ts`, `meta-share.test.ts` |
+| Q-08 | Alltagsbetrieb: GitHub-Pages-Deployment mit Tests als Gate, Installationsknopf, Backup-Erinnerung | Umgesetzt | 2026-11-25 | 08:36:18 | #009 `ee17d5f` | `.github/workflows/pages.yml`, `offline/install-prompt.ts`, `application/settings-store.ts`, `ui/screens/settings.ts` | `install-prompt.test.ts`, `meta-share.test.ts` |
 
 ## 2. Meilensteinplan
 
@@ -92,8 +98,21 @@ Tests: 761/761 grün (41 Dateien, +227), `npm run build` ohne Warnungen.
 Dateien: `src/offline/{update-policy,service-worker}.ts`, `src/ui/components/update-banner.ts`, `src/domain/lift-detection.ts`, `src/adapters/sensors/lift-detector.ts`, `public/icons/*.svg`, `public/manifest.webmanifest`, `index.html`, `src/app/{container,bootstrap}.ts`, `src/ui/screens/{player,settings}.ts`, `tests/{build,ui,unit}/*`, Doku.
 Tests: 849/849 grün (47 Dateien, +88), `npm run build` ohne Warnungen (15 Precache-Einträge inkl. `wasm/zxing_reader.wasm`).
 
+### #009 – `ee17d5f` – 2026-11-25 08:36:18
+`feat(alltag)`: Alltagstauglichkeit, Version 0.2.0 (F-16 … F-20, Q-08 umgesetzt). Anforderungsänderung des Auftraggebers: im Alltag auf dem Smartphone nutzbar; Import, Export, Speichern und Laden vollumfänglich; Scannen, manuelle Eingabe, Laden und Importieren; Teilen mit anderen Personen; Codes nach einem Datum als ungültig markieren; Wort, Nutzen, Satz, Tag und Ablaufdatum je Code.
+Dateien: `src/domain/{expiry,item-meta,share-format}.ts`, `src/adapters/share/{link-codec,share-adapter}.ts`, `src/application/{import-service,collection-service,backup-service,playback-service,settings-store}.ts`, `src/offline/install-prompt.ts`, `src/ui/components/{meta-fields,item-editor,share-actions,import-dialog,badges,dialog}.ts`, `src/ui/screens/{collections,scanner,player,settings}.ts`, `src/domain/{types,backup-schema,csv-items}.ts`, `.github/workflows/pages.yml`, `src/app/{container,version}.ts`, Doku.
+Entscheidungen: ADR-44 … ADR-50 (Zusatzangaben additiv ohne Schema-Sprung, Ablaufdatum markiert nur, Austauschformat je Sammlung, Teilen mit Rückfällen, zweistufiger Import, Pages mit Tests als Gate, lokale Backup-Erinnerung).
+Gefunden und behoben durch Tests: unbehandelte Ablehnung beim Entpacken beschädigter Links (Link-Codec).
+Tests: 978/978 grün (55 Dateien, +129), `npm run build` ohne Warnungen.
+
 ## 4. Endabnahme (Meilenstein 7)
 
 - Alle Muss-Anforderungen F-01 … F-15 sowie S-01 … S-07 und Q-01 … Q-07 sind „Umgesetzt“ (siehe Tabelle).
 - Quality Gate: `npm test` 849/849, `npm run build` 0 Fehler / 0 Warnungen.
 - Offene fachliche Punkte außerhalb der Software (Spezifikation Kap. 2, 25 Phase 0): Scanner-/Kassenmodelle, Stellenbedeutung von `2063701…`, reale Anzeige-/Leerzeiten (20er-Kalibrierung an der Hardware), Hardwaretests von Lift-to-Pause. Rückkanal (Frontkamera/Mikrofon/Kassenschnittstelle) ist laut Spezifikation 9.3 nicht Teil von Version 1.
+
+## 5. Stand nach Alltags-Erweiterung (Version 0.2.0)
+
+- Zusätzlich umgesetzt: F-16 … F-20 und Q-08 (siehe Tabelle). Quality Gate: `npm test` 978/978, `npm run build` 0 Fehler / 0 Warnungen.
+- Noch am echten Gerät zu prüfen (nicht automatisiert testbar): Web-Share-Dialog mit Dateien auf dem Zielgerät (Chrome Android erlaubt je nach Version nur `.txt`; die App weicht automatisch aus), Installation über GitHub Pages, Datumswähler des Telefons.
+- Einmalig nötig (außerhalb des Codes): GitHub-Repository → Settings → Pages → Source „GitHub Actions“; danach veröffentlicht jeder Push auf `main` die App nach bestandenen Tests.
