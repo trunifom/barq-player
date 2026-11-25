@@ -53,6 +53,10 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | F-21 | Gemeinsame Bibliothek: Sammlungen mit Wort, Nutzen, Satz, Tags und Ablaufdatum mit der App veröffentlichen, auf jedem Gerät übernehmen und aktualisieren (ohne Neuerfassung) | Umgesetzt | 2026-11-25 | 08:55:38 | #010 `aa738b3` | `domain/library.ts`, `application/library-service.ts`, `application/collection-service.ts`, `ui/screens/collections.ts`, `app/bootstrap.ts` | `library.test.ts`, `library-service.test.ts`, `ui/library.test.ts` |
 | F-22 | Lokale Änderungen an Bibliotheks-Sammlungen erkennen, nie automatisch überschreiben; „Von Bibliothek lösen“ | Umgesetzt | 2026-11-25 | 08:55:38 | #010 `aa738b3` | `domain/library.ts`, `application/collection-service.ts`, `ui/screens/collections.ts` | `library.test.ts`, `library-service.test.ts`, `ui/library.test.ts` |
 | Q-09 | Bibliotheks-Gate vor Veröffentlichung (jede Datei streng geprüft), Index-Skript, netzwerkbevorzugter Laufzeitcache statt Precache | Umgesetzt | 2026-11-25 | 08:55:38 | #010 `aa738b3` | `scripts/library-index.mjs`, `vite.config.ts`, `public/library/` | `tests/build/library.test.ts`, `production-build.test.ts` |
+| F-23 | Kamera-Zoom (Hardware, digitaler Rückfall, Schieber, Voreinstellungen, Zwei-Finger-Geste) und Kamera-Bedienfeld (Auflösung, Fokus, Belichtung) | Umgesetzt | 2026-11-25 | 09:26:59 | #011 `972cf70` | `domain/camera-controls.ts`, `adapters/camera/camera-adapter.ts`, `ui/components/camera-controls.ts`, `ui/screens/scanner.ts` | `camera-controls.test.ts`, `camera-and-fader-setup.test.ts` |
+| F-24 | Kleine Codes: hochauflösendes Foto (ImageCapture) und Kamera-App-Aufnahme, Auswertung wie Foto-Import | Umgesetzt | 2026-11-25 | 09:26:59 | #011 `972cf70` | `adapters/camera/camera-adapter.ts`, `ui/screens/scanner.ts` | `camera-controls.test.ts`, `camera-and-fader-setup.test.ts` |
+| F-25 | Fader: Auswahl der abzuspielenden Codes (Häkchen, Tag-Filter, Suche, Alle/Keine/Gefilterte) | Umgesetzt | 2026-11-25 | 09:26:59 | #011 `972cf70` | `application/playback-service.ts`, `ui/screens/player.ts` | `playback-selection.test.ts`, `camera-and-fader-setup.test.ts` |
+| F-26 | Fader: Zeiten pro Lauf anpassbar, als Profil speicherbar, im Sitzungsprotokoll festgehalten | Umgesetzt | 2026-11-25 | 09:26:59 | #011 `972cf70` | `ui/screens/player.ts`, `application/playback-service.ts`, `domain/backup-schema.ts` | `playback-selection.test.ts`, `camera-and-fader-setup.test.ts` |
 
 ## 2. Meilensteinplan
 
@@ -115,6 +119,13 @@ Entscheidungen: ADR-51 … ADR-53 (Dateien im Repository statt Schreibzugriff au
 Hinweis an den Auftraggeber: Das Beispiel `2345678765432` hat eine falsche GS1-Prüfziffer (richtig: `2345678765430`); die App lehnt es ab und korrigiert nie selbst (Regel 4).
 Tests: 1028/1028 grün (59 Dateien, +50), `npm run build` ohne Warnungen.
 
+### #011 – `972cf70` – 2026-11-25 09:26:59
+`feat(kamera)`: Kamera-Zoom und Kamera-Einstellungen, Fader mit Codeauswahl und Zeiten pro Lauf, Version 0.4.0 (F-23 … F-26 umgesetzt). Anforderungsänderung des Auftraggebers: Strichcodes im Lager sind für die Handykamera zu klein; Nahaufnahmen werden unscharf und verrauscht.
+Dateien: `src/domain/camera-controls.ts`, `src/adapters/camera/camera-adapter.ts`, `src/ui/components/camera-controls.ts`, `src/ui/screens/{scanner,player}.ts`, `src/application/{playback-service,settings-store}.ts`, `src/domain/{types,backup-schema}.ts`, `src/ui/styles/main.css`, `src/app/version.ts`, `tests/{unit,integration,ui}/*`, Doku.
+Entscheidungen: ADR-54 … ADR-56 (Regler nur bei Unterstützung und ehrlicher digitaler Zoom; Standardauflösung 1920×1080 und hochauflösendes Foto; Zeiten pro Lauf mit Protokoll).
+Offen (nur am Gerät prüfbar): Welche Regler (Hardware-Zoom, Fokus, Belichtung, `ImageCapture`) ein konkretes Handy und die jeweilige Chrome-Version anbieten; Wirkung auf die Erkennungsrate kleiner Codes.
+Tests: 1082/1082 grün (62 Dateien, +54), `npm run build` ohne Warnungen.
+
 ## 4. Endabnahme (Meilenstein 7)
 
 - Alle Muss-Anforderungen F-01 … F-15 sowie S-01 … S-07 und Q-01 … Q-07 sind „Umgesetzt“ (siehe Tabelle).
@@ -123,6 +134,6 @@ Tests: 1028/1028 grün (59 Dateien, +50), `npm run build` ohne Warnungen.
 
 ## 5. Stand nach Alltags-Erweiterung (Version 0.2.0)
 
-- Zusätzlich umgesetzt: F-16 … F-20 und Q-08 (Version 0.2.0) sowie F-21, F-22 und Q-09 (Version 0.3.0, gemeinsame Bibliothek). Quality Gate: `npm test` 1028/1028, `npm run build` 0 Fehler / 0 Warnungen.
+- Zusätzlich umgesetzt: F-16 … F-20 und Q-08 (Version 0.2.0) sowie F-21, F-22 und Q-09 (Version 0.3.0, gemeinsame Bibliothek) und F-23 … F-26 (Version 0.4.0, Kamera und Fader). Quality Gate: `npm test` 1082/1082, `npm run build` 0 Fehler / 0 Warnungen.
 - Noch am echten Gerät zu prüfen (nicht automatisiert testbar): Web-Share-Dialog mit Dateien auf dem Zielgerät (Chrome Android erlaubt je nach Version nur `.txt`; die App weicht automatisch aus), Installation über GitHub Pages, Datumswähler des Telefons.
 - Einmalig nötig (außerhalb des Codes): GitHub-Repository → Settings → Pages → Source „GitHub Actions“; danach veröffentlicht jeder Push auf `main` die App nach bestandenen Tests.
