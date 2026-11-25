@@ -13,7 +13,7 @@ offline (Service Worker, unabhängig)
 
 | Schicht | Inhalt | Darf nicht |
 |---|---|---|
-| `src/domain/` | Prüfziffern, Sequenzen, Zustandsautomat, Interleaving, Fehler, Typen, Ablaufdatum (`expiry.ts`), Zusatzangaben (`item-meta.ts`), Austauschformat (`share-format.ts`) | DOM, `window`, Kamera, IndexedDB, Browser-/Node-APIs |
+| `src/domain/` | Prüfziffern, Sequenzen, Zustandsautomat, Interleaving, Fehler, Typen, Ablaufdatum (`expiry.ts`), Zusatzangaben (`item-meta.ts`), Austauschformat (`share-format.ts`), Gemeinsame Bibliothek (`library.ts`) | DOM, `window`, Kamera, IndexedDB, Browser-/Node-APIs |
 | `src/application/` | Use-Cases (Capture, Collections, Playback, Backup, Import, Validation) | direkt DOM anfassen |
 | `src/adapters/` | Kamera, Decoder, Renderer, Dexie, Sensoren, Teilen (`share/`: Web Share, Zwischenablage, Link-Codec) | Fachentscheidungen treffen |
 | `src/ui/` | Mobile-first Screens/Komponenten | Fachlogik enthalten |
@@ -61,6 +61,12 @@ Siehe Spezifikation Kap. 16. Barcodes immer als `string`; `syntaxStatus`, `check
 **Link-Codec** (`src/adapters/share/link-codec.ts`): kompaktes JSON → gzip (`CompressionStream`, falls vorhanden, sonst unkomprimiert mit Präfix `r.`) → Base64URL, Präfix `g.`; Link = `<App-Adresse>#/collections?import=<Nutzlast>`. Der Hash-Teil einer URL verlässt den Browser nicht (kein Server). Grenzen: Nutzlast ≤ 6000 Zeichen (darüber wird zur Datei geraten), entpackt ≤ 2 MiB (Schutz vor Dekompressionsbomben); beschädigte oder abgeschnittene Links ergeben `ERR_IMPORT_SCHEMA_INVALID` mit verständlicher Meldung. Beim Öffnen wird der Hash sofort per `history.replaceState` bereinigt, damit ein Neuladen den Dialog nicht erneut öffnet.
 
 **Teilen-Adapter** (`share-adapter.ts`): `shareFile`/`shareJsonFile`/`shareText`/`copyText` kapseln `navigator.share`/`canShare`/`clipboard`. Ein abgebrochener Dialog (`AbortError`) ist kein Fehler; fehlende Unterstützung liefert `unsupported`, worauf die Oberfläche auf Download bzw. Kopieren ausweicht und das ehrlich meldet.
+
+## 2b-3. Gemeinsame Bibliothek (`src/domain/library.ts`, `src/application/library-service.ts`, `scripts/library-index.mjs`)
+- **Dateien:** `public/library/<name>.json` im Austauschformat (2b-1) plus `public/library/index.json` = `{ format: "barq-player-library", schemaVersion: 1, files: [...] }`. Der Index wird von `scripts/library-index.mjs` aus dem Ordner erzeugt (`npm run library`, automatisch bei `npm run build` und `npm run dev`; unzulässige Dateinamen brechen mit Fehler ab). Der Test `tests/build/library.test.ts` ist das **Gate vor der Veröffentlichung**: Index muss zu den Dateien passen, jede Datei muss `validateShareFile` bestehen (jeder Code streng geprüft).
+- **`LibraryService.check(heute)`** lädt Index und Dateien (`fetch` mit `cache: 'no-store'`, injizierbar), prüft jede Datei einzeln und liefert `entries` (inkl. Anzahl, abgelaufene Codes, Status, lokale Sammlung) und `problems`. Index fehlt (404) → leere Bibliothek; Netzwerk-/Serverfehler → `ERR_LIBRARY_UNAVAILABLE`; ungültiger Index → `ERR_IMPORT_SCHEMA_INVALID`. **`apply(entry)`** legt eine neue Sammlung an (`importShare` mit Verknüpfung) oder ersetzt den Inhalt der verknüpften (`replaceFromShare`, atomar in einer Transaktion).
+- **Datenmodell:** `Collection.library?: { file, hash, importedAt }` (additiv, Dexie-Schema bleibt 1; im Backup erhalten und dort geprüft, nicht im Austauschformat).
+- **Oberfläche:** Karte „Gemeinsame Bibliothek“ in der Sammlungsliste (Status je Datei, Übernehmen/Aktualisieren/Alle übernehmen, Probleme, erneut prüfen), Kennzeichen „Bibliothek“ an Sammlungen, „In Bibliothek veröffentlichen“ (Datei + Anleitung + Warnung) und „Von Bibliothek lösen“ im Detail; beim App-Start eine stille Prüfung mit Hinweis (offline bleibt still).
 
 ## 2b-2. Ablaufdatum (`src/domain/expiry.ts`)
 Ablaufdatum = Kalendertag ohne Uhrzeit/Zeitzone. Gültig **bis einschließlich** dem Ablauftag, ab dem Folgetag `expired`; `soon` bei ≤ 7 Tagen (`EXPIRY_WARN_DAYS`). „Heute“ ist der Kalendertag der **Ortszeit** des Geräts und wird immer übergeben (deterministisch testbar; Schaltjahre und Monatsgrenzen über UTC-Tageszahlen). Ein ungültiges Datum zählt vorsichtshalber als abgelaufen. `parseDateInput` akzeptiert `JJJJ-MM-TT`, `TT.MM.JJJJ`, `T.M.JJJJ` und `TT/MM/JJJJ`, lehnt aber zweistellige Jahre ab (mehrdeutig).
@@ -123,6 +129,7 @@ Greedy nach größter Restmenge ohne direkten Vorgänger gleicher Identität (`k
 | `ERR_OFFLINE_SETUP_FAILED` | Service Worker/Offline-Einrichtung oder Aktivierung einer neuen Version fehlgeschlagen | `update-policy`, `service-worker` |
 | `ERR_STORAGE_WRITE_FAILED`, `ERR_STORAGE_QUOTA_EXCEEDED` | Persistenz | M3 |
 | `ERR_IMPORT_SCHEMA_INVALID`, `ERR_IMPORT_CSV_INVALID` | Import | M3 |
+| `ERR_LIBRARY_UNAVAILABLE` | Gemeinsame Bibliothek nicht erreichbar (offline, Server-Fehler) | M9 |
 | `ERR_PLAYBACK_FAILED` | Laufzeitfehler im Player (→ Symbol sofort ausblenden) | M2/M6 |
 | `ERR_UNKNOWN` | Fallback | überall |
 
@@ -405,3 +412,12 @@ Entscheidung: Der Workflow `.github/workflows/pages.yml` führt `npm test` und `
 
 ### ADR-50: Installationsknopf und Backup-Erinnerung lokal
 Entscheidung: `beforeinstallprompt` wird abgefangen und als Knopf in den Einstellungen angeboten; `lastBackupAt` liegt in den Bedieneinstellungen (`localStorage`) und löst nach 14 Tagen eine Erinnerung in der Sammlungsliste aus. Grund: Die Daten liegen nur auf dem Gerät (kein Cloud-Konto); im Alltag ist die regelmäßige Sicherung das größte Risiko, und eine Erinnerung ist ehrlicher als eine Automatik, die ohne Cloud nicht existieren kann.
+
+### ADR-51: Gemeinsame Bibliothek als Dateien im Repository, App schreibt nie nach GitHub
+Entscheidung: Sammlungen werden als `public/library/*.json` (Austauschformat aus ADR-46) zusammen mit der App veröffentlicht; die App liest sie von der **eigenen Herkunft** (`./library/…`) und erzeugt zum Veröffentlichen nur die Datei. Das Hochladen nach GitHub geschieht außerhalb der App. Grund: AGENTS.md Regel 1 verbietet externe APIs zur Laufzeit – ein direkter Schreibzugriff auf die GitHub-API würde einen Zugriffstoken im Browser (localStorage) erfordern und wäre ein Sicherheitsrisiko sowie eine Offline-Abhängigkeit. Mit Dateien bleibt die App offline-first, jede Version ist in Git nachvollziehbar (Verlauf, Rückgängig), und die vorhandene CI prüft jede Datei vor der Veröffentlichung. Folge: Die Bibliothek ist öffentlich lesbar (GitHub Pages) – die Oberfläche warnt davor.
+
+### ADR-52: Bibliotheksdateien netzwerkbevorzugt statt vorab gecacht
+Entscheidung: `library/**` ist vom Precache ausgeschlossen (`globIgnores`); ein Workbox-Laufzeitcache `barq-library` mit `NetworkFirst` (Timeout 4 s) liefert online immer den aktuellen Stand und offline den zuletzt gesehenen. Grund: Mit Precache würden Daten-Updates erst mit einer neuen App-Version (und deren Freigabe nach Update-Policy, ADR-39) ankommen; die Daten sollen unabhängig vom Programmcode aktualisierbar sein. Der Test `production-build.test.ts` sichert beides ab (nicht im Precache, Laufzeitregel vorhanden).
+
+### ADR-53: Aktualisierung über Fingerabdruck, nie automatisch überschreibend
+Entscheidung: Jede übernommene Sammlung speichert `library = { file, hash, importedAt }` (Fingerabdruck des übernommenen Inhalts, `contentHash`). Der Status ergibt sich aus Vergleich von veröffentlichtem Hash, gespeichertem Hash und aktuellem lokalen Inhalt (`new`, `current`, `update`, `update-modified`, `modified`). Prüfen schreibt nie; Aktualisieren ersetzt den Inhalt atomar (ID und lokaler Name bleiben), und bei `update-modified` erst nach ausdrücklicher Bestätigung. Der Name zählt nicht als Änderung, Menge, Reihenfolge und alle Zusatzangaben schon. „Von Bibliothek lösen“ entfernt die Verknüpfung. Grund: Lokale Arbeit darf nie unbemerkt verloren gehen; ein nicht kryptografischer 53-Bit-Fingerabdruck genügt zur Änderungserkennung (kein Sicherheitsmerkmal). Dateinamen im Index sind streng auf `[Buchstaben Ziffern _ - .]` + `.json` begrenzt (kein Pfadzugriff), eine fehlerhafte Datei blockiert die übrigen nicht.

@@ -22,12 +22,24 @@ export type CatalogStatus = 'unchecked' | 'known' | 'unknown' | 'inactive';
 /** Herkunft eines Eintrags. */
 export type ItemSource = 'camera' | 'image' | 'manual' | 'import' | 'sequence';
 
+/** Verknüpfung einer lokalen Sammlung mit einer Datei der gemeinsamen Bibliothek (`library/*.json`). */
+export interface LibraryLink {
+  /** Dateiname im Ordner `library/`. */
+  file: string;
+  /** Fingerabdruck des Inhalts beim letzten Übernehmen. */
+  hash: string;
+  /** Zeitpunkt des letzten Übernehmens (ISO). */
+  importedAt: string;
+}
+
 /** Eine Sammlung (Liste) von Codes. */
 export interface Collection {
   id: string;
   name: string;
   createdAt: string;
   updatedAt: string;
+  /** Gesetzt, wenn die Sammlung aus der gemeinsamen Bibliothek stammt. */
+  library?: LibraryLink;
 }
 
 /** Ein gespeicherter Code in einer Sammlung. Syntax, Prüfziffer und Artikelstamm sind getrennte Aussagen. */

@@ -3,6 +3,8 @@
  * Als eigene Funktion (statt in `main.ts`), damit sie in Tests mit jsdom und Überschreibungen laufen kann.
  */
 import { requestPersistentStorage } from '../adapters/persistence/db';
+import { AppError } from '../domain/errors';
+import { localDateString } from '../domain/expiry';
 import { h, setChildren } from '../ui/components/dom';
 import { mountUpdateBanner } from '../ui/components/update-banner';
 import { mountCollections } from '../ui/screens/collections';
@@ -112,6 +114,18 @@ export function bootstrap(host: HTMLElement, env: AppEnvironment): RunningApp {
   void requestPersistentStorage(ctx.storageManager).then((s) => {
     if (s.error) ctx.logger.logError(s.error, { source: 'persist' });
   });
+
+  // Gemeinsame Bibliothek beim Start still prüfen (nur Hinweis, nichts wird ohne Zustimmung übernommen).
+  void ctx.library
+    .check(localDateString(new Date(ctx.nowIso())))
+    .then((check) => {
+      const open = check.entries.filter((e) => e.status === 'new' || e.status === 'update' || e.status === 'update-modified').length;
+      if (open > 0) ctx.notify.info(`Gemeinsame Bibliothek: ${open} neue oder aktualisierte Sammlung(en) – unter „Sammlungen“ übernehmen.`);
+    })
+    .catch((error: unknown) => {
+      // Offline ist normal und bleibt still; andere Fehler gehören ins Diagnose-Log.
+      if (!(error instanceof AppError && error.code === 'ERR_LIBRARY_UNAVAILABLE')) ctx.logger.logError(error, { source: 'library-startup' });
+    });
 
   return {
     ctx,

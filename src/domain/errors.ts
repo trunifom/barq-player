@@ -26,6 +26,7 @@ export type ErrorCode =
   | 'ERR_STORAGE_QUOTA_EXCEEDED'
   | 'ERR_IMPORT_SCHEMA_INVALID'
   | 'ERR_IMPORT_CSV_INVALID'
+  | 'ERR_LIBRARY_UNAVAILABLE'
   | 'ERR_NOT_FOUND'
   | 'ERR_RENDER_FAILED'
   | 'ERR_PLAYBACK_FAILED'
@@ -106,6 +107,10 @@ export const ERROR_CATALOG: Readonly<Record<ErrorCode, ErrorCatalogEntry>> = {
   ERR_IMPORT_CSV_INVALID: {
     userMessage: 'Die CSV-Datei enthält fehlerhafte Zeilen.',
     recoveryHint: 'Fehlerbericht pro Zeile beachten und Datei korrigieren.'
+  },
+  ERR_LIBRARY_UNAVAILABLE: {
+    userMessage: 'Die gemeinsame Bibliothek konnte nicht geladen werden.',
+    recoveryHint: 'Internetverbindung prüfen und später erneut versuchen. Bereits übernommene Sammlungen bleiben nutzbar.'
   },
   ERR_NOT_FOUND: {
     userMessage: 'Der gesuchte Eintrag existiert nicht (mehr).',

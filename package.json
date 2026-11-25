@@ -1,12 +1,13 @@
 {
   "name": "barq-player",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "description": "BarQPlayer – Offline-first Android PWA zum Scannen, Erzeugen und zeitgesteuerten Abspielen (Barcode- & QR-Fader) von Lager-Codes.",
   "scripts": {
-    "dev": "vite --host",
-    "build": "tsc --noEmit && vite build",
+    "library": "node scripts/library-index.mjs",
+    "dev": "node scripts/library-index.mjs && vite --host",
+    "build": "node scripts/library-index.mjs && tsc --noEmit && vite build",
     "preview": "vite preview --host",
     "test": "vitest run",
     "test:watch": "vitest",

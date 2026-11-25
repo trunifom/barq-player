@@ -19,6 +19,7 @@ Alle Meilensteine sind umgesetzt (Details und Nachweise je Anforderung in [`docs
 | M6 | Mobile-First-UI (Scanner, Sammlungen, Generator, Fader, Einstellungen), 20er-Kalibrierung, globale Fehler-/Hintergrund-Absicherung | ✅ |
 | M7 | Offline-Härtung (Service Worker, Update-Policy, Icons), Lift-to-Pause, Endabnahme | ✅ |
 | M8 | Alltagstauglichkeit (Version 0.2.0): Zusatzangaben je Code (Wort, Nutzen, Satz, Tags, Ablaufdatum), Ablauf-Markierung, Suche/Filter, Teilen (Datei, Link, Text), vollständiger Import (geteilte Sammlung, Backup, CSV, Liste, Link), Installationsknopf, Backup-Erinnerung, Veröffentlichung per GitHub Pages | ✅ |
+| M9 | Gemeinsame Bibliothek (Version 0.3.0): Sammlungen samt Wort, Nutzen, Satz, Tags und Ablaufdatum werden als Dateien im Repository veröffentlicht; wer die Web-Adresse öffnet, kann sie übernehmen und aktualisieren – ohne Neuerfassung | ✅ |
 
 **Noch nicht Teil von Version 1** (Spezifikation 9.3): Frontkamera-/Mikrofon-Rückkanal, Kassenschnittstelle, Synchronisierung. Die Stellenbedeutung des Nummernbereichs `2063701…` und die tatsächlichen Scanner-/Kassenzeiten müssen an der realen Hardware geklärt werden (Kalibrierung).
 
@@ -34,6 +35,9 @@ Kamera und App-Installation funktionieren nur über **HTTPS**. Der mitgelieferte
 4. Diese Adresse am Handy in **Chrome** öffnen, kurz mit Netz warten („Die App ist jetzt offline nutzbar“) und dann **Einstellungen → App installieren** (oder Chrome-Menü ⋮ → *App installieren*).
 
 Danach startet BarQPlayer wie jede App vom Startbildschirm, auch ohne Netz. Updates erscheinen als Hinweis und werden nie mitten in einer Fader-Sitzung aktiviert. Alle Daten bleiben auf dem Gerät – sichern Sie regelmäßig (*Einstellungen → Backup senden*), die App erinnert nach 14 Tagen.
+
+## Codes für alle: die gemeinsame Bibliothek
+Damit niemand Codes neu erfassen muss, lassen sich Sammlungen **zusammen mit der App veröffentlichen**: Datei in den Ordner [`public/library/`](public/library) legen (z. B. über GitHub „Add file → Upload files“), committen – nach dem Lauf „Veröffentlichen“ kann jeder, der die Web-Adresse öffnet, die Sammlung unter *Sammlungen → Gemeinsame Bibliothek* übernehmen (inklusive Wort, Nutzen, Satz, Tags und Ablaufdatum) und später aktualisieren. Der Index `public/library/index.json` wird bei `npm run build` bzw. `npm run library` automatisch erzeugt; ein Test prüft vor jeder Veröffentlichung, dass jede Datei gültig ist. **Die Bibliothek ist öffentlich lesbar** – keine vertraulichen Daten ablegen. Die App schreibt nie selbst nach GitHub. Details: [Benutzerhandbuch, Kapitel 11](docs/USER_GUIDE.md).
 
 ## Setup
 ```bash

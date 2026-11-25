@@ -7,11 +7,13 @@
  */
 import { AppError } from './errors';
 import { isValidDateString } from './expiry';
+import { isValidLibraryFileName } from './library';
 import type {
   BarcodeItem,
   CatalogProduct,
   Collection,
   FaderProfile,
+  LibraryLink,
   PlaybackEvent,
   SequenceDefinition,
   SequenceTemplate,
@@ -238,7 +240,23 @@ export function validateBackup(input: unknown): BackupValidation {
 
   const collections: Collection[] = r.list(dataRaw, 'collections', 'data').map((o, i) => {
     const p = `data.collections[${i}]`;
-    return { id: r.str(o, 'id', p, { nonEmpty: true }), name: r.str(o, 'name', p, { nonEmpty: true }), createdAt: r.str(o, 'createdAt', p), updatedAt: r.str(o, 'updatedAt', p) };
+    const libRaw = o['library'];
+    let library: LibraryLink | undefined;
+    if (libRaw !== undefined) {
+      if (!isRec(libRaw)) r.add(`${p}.library`, 'muss ein Objekt sein');
+      else {
+        const file = r.str(libRaw, 'file', `${p}.library`, { nonEmpty: true });
+        if (file !== '' && !isValidLibraryFileName(file)) r.add(`${p}.library.file`, 'ist kein zulässiger Bibliotheks-Dateiname');
+        library = { file, hash: r.str(libRaw, 'hash', `${p}.library`), importedAt: r.str(libRaw, 'importedAt', `${p}.library`) };
+      }
+    }
+    return {
+      id: r.str(o, 'id', p, { nonEmpty: true }),
+      name: r.str(o, 'name', p, { nonEmpty: true }),
+      createdAt: r.str(o, 'createdAt', p),
+      updatedAt: r.str(o, 'updatedAt', p),
+      ...(library === undefined ? {} : { library })
+    };
   });
 
   const items: BarcodeItem[] = r.list(dataRaw, 'items', 'data').map((o, i) => {

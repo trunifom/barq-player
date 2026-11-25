@@ -15,6 +15,7 @@ BarQPlayer erfasst Barcodes und QR-Codes im Lager, erzeugt Codes und Zahlenreihe
 8. Kassen-Kalibrierung (20er-Test)
 9. Backup, Teilen, Import und CSV-Austausch
 10. Fehlerbehebung
+11. Gemeinsame Bibliothek – Codes einmal erfassen, überall nutzen
 
 ---
 
@@ -202,3 +203,36 @@ Die App merkt sich, wann Sie zuletzt gesichert haben (*Einstellungen*), und erin
 | Daten verschwunden | Browserdaten gelöscht? Letztes **Backup wiederherstellen** (Kapitel 9). |
 
 **Diagnose:** *Einstellungen → Diagnose* zeigt Decoder-Engine, App-Version und das Fehlerprotokoll. Es enthält Fehlercodes, aber keine Barcode-Inhalte.
+
+## 11. Gemeinsame Bibliothek – Codes einmal erfassen, überall nutzen
+**Die Idee:** Sie erfassen Ihre Codes **einmal**, veröffentlichen die Sammlung zusammen mit der App und **jeder, der die Web-Adresse der App öffnet**, kann sie übernehmen – mit allen Strichcodes **und** den Angaben dazu (Wort, Nutzen, Satz, Tags, Ablaufdatum). Niemand muss Codes neu erfassen, auch nicht nach einer Neuinstallation oder auf einem neuen Handy.
+
+**Ein Beispiel:** Der Code `2345678765430` gehört zur Firma XYZ (Tag `Firma XYZ`), ist das Produkt „Schraube 2x3mm“ (Wort), ist nur gültig für „Maschine 2374“ (Tag oder Satz) und gilt bis 31.12.2035 (Ablaufdatum). Alles wird mit dem Code gespeichert, geteilt und wiedergefunden (Suche nach „XYZ“ oder „2374“).
+
+> **Prüfziffer beachten:** Bei EAN-13 ist die **13. Stelle eine Prüfziffer**. Ein Code wie `2345678765432` hat eine falsche Prüfziffer und wird abgelehnt – die App korrigiert **nie** selbst. Für die ersten zwölf Stellen `234567876543` lautet die richtige Prüfziffer `0`, also `2345678765430`. Mit dem Generator (*Prüfziffer berechnen*) bekommen Sie sie automatisch.
+
+### So veröffentlichen Sie eine Sammlung (einmal pro Änderung)
+1. Erfassen Sie die Codes mit allen Angaben in einer Sammlung (Kapitel 3 und 4).
+2. Öffnen Sie die Sammlung und tippen Sie auf **In Bibliothek veröffentlichen**. Die App lädt eine Datei herunter (z. B. `Schrauben_M3.json`) und zeigt die Anleitung.
+3. Öffnen Sie Ihr Repository auf **GitHub** (im Handy-Browser oder am PC), gehen Sie in den Ordner **`public/library`**, wählen Sie **Add file → Upload files**, legen Sie die Datei hinein und bestätigen Sie mit **Commit changes**.
+4. Nach ein bis zwei Minuten ist die neue Version veröffentlicht (Lauf „Veröffentlichen“ unter *Actions* – nur wenn er erfolgreich ist, wird veröffentlicht; eine fehlerhafte Datei verhindert das Update).
+
+Eine Datei mit **gleichem Namen ersetzt** die alte – so aktualisieren Sie eine Sammlung. Mehrere Sammlungen = mehrere Dateien.
+
+### So übernehmen Sie Sammlungen (jedes Gerät, jede Person)
+- Öffnen Sie die App-Adresse. Beim Start erscheint ein Hinweis, wenn es neue oder aktualisierte Sammlungen gibt.
+- Unter **Sammlungen → Gemeinsame Bibliothek** sehen Sie jede veröffentlichte Sammlung mit Anzahl der Codes und Status:
+  - **Neu** – noch nicht auf diesem Gerät → **Übernehmen** (oder **Alle übernehmen**).
+  - **Aktuell** – identisch mit der veröffentlichten Version.
+  - **Neue Version verfügbar** → **Aktualisieren** ersetzt den Inhalt der Sammlung.
+  - **Neue Version – lokal geändert** → Sie haben die Sammlung hier verändert. **Aktualisieren** fragt nach, weil Ihre Änderungen dabei verloren gehen.
+  - **Lokal geändert** – nur hier geändert, keine neue Version.
+- **Nichts wird automatisch überschrieben.** Die App prüft nur und meldet; Sie entscheiden.
+- Übernommene Sammlungen tragen das Kennzeichen **Bibliothek**. Mit **Von Bibliothek lösen** machen Sie daraus eine eigene Kopie, die nie wieder überschrieben wird.
+- **Offline** funktioniert alles Übernommene weiter. Die Prüfung auf Neuigkeiten braucht Internet; ohne Netz erscheint nur ein Hinweis.
+
+### Wichtig: die Bibliothek ist öffentlich
+Alles unter `public/library` wird mit der App veröffentlicht und ist für **jeden lesbar, der die Adresse kennt** (auch bei einem privaten Repository, denn GitHub Pages ist öffentlich). Veröffentlichen Sie **keine vertraulichen** Daten (z. B. interne Preise oder Kundennamen). Für nicht öffentliche Daten nutzen Sie **Teilen (Datei)** bzw. **Teilen (Link)** aus Kapitel 9 – damit erreichen Sie gezielt einzelne Personen.
+
+### Was die App nicht tut
+Die App **schreibt nie selbst nach GitHub**. Sie erzeugt nur die Datei; das Hochladen machen Sie (Schritt 3). Dadurch liegen keine Zugangsdaten in der App und die App bleibt offline-fähig.

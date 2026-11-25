@@ -7,6 +7,7 @@ import type { Dispose, Route } from '../../src/app/routes';
 import type { CameraAdapter, CameraSession } from '../../src/adapters/camera/camera-adapter';
 import type { DecodedCode, DecoderPort, FileScanResult, FrameResult, HybridDecoder } from '../../src/adapters/decoder/decoder-adapter';
 import type { KeyValueStorage } from '../../src/application/settings-store';
+import type { FetchLike } from '../../src/application/library-service';
 import type { Symbology } from '../../src/domain/types';
 import { ManualScheduler } from '../helpers/scheduler';
 import { disposeDbs } from '../integration/helpers';
@@ -81,7 +82,7 @@ let counter = 0;
  * Erzeugt eine vollständig kontrollierbare Umgebung (Zeit, Decoder, Kamera, Speicher).
  * @param over - optionale Überschreibungen (Einstellungsspeicher, Speicherverwaltung, Wake-Lock-API).
  */
-export function testEnv(over: { storage?: KeyValueStorage | null; storageManager?: StorageManagerLike; wakeLockApi?: WakeLockApi; liftTarget?: MotionTarget } = {}): TestEnv {
+export function testEnv(over: { storage?: KeyValueStorage | null; storageManager?: StorageManagerLike; wakeLockApi?: WakeLockApi; liftTarget?: MotionTarget; fetch?: FetchLike } = {}): TestEnv {
   (HTMLMediaElement.prototype as unknown as { play: () => Promise<void> }).play = () => Promise.resolve();
   const sched = new ManualScheduler();
   const noticeTimers = new ManualScheduler();
@@ -108,7 +109,9 @@ export function testEnv(over: { storage?: KeyValueStorage | null; storageManager
       storageManager: over.storageManager,
       liftTimers: liftSched,
       liftNow: () => clock.ms,
-      liftTarget: over.liftTarget // Standard in Tests: keine Bewegungssensoren (jsdom bietet DeviceMotionEvent an)
+      liftTarget: over.liftTarget, // Standard in Tests: keine Bewegungssensoren (jsdom bietet DeviceMotionEvent an)
+      // Standard in Tests: keine Bibliothek veröffentlicht (404) – kein echtes Netzwerk
+      fetch: over.fetch ?? (() => Promise.resolve({ ok: false, status: 404, text: () => Promise.resolve('') }))
     }
   };
   return { env, sched, decoder, camera, noticeTimers, liftSched, clock };
@@ -129,7 +132,7 @@ export interface UiSetup {
 }
 
 /** Erzeugt Kontext und leeres Wurzelelement für Screen-Tests. */
-export function setupUi(over: { storage?: KeyValueStorage | null; storageManager?: StorageManagerLike; liftTarget?: MotionTarget } = {}): UiSetup {
+export function setupUi(over: { storage?: KeyValueStorage | null; storageManager?: StorageManagerLike; liftTarget?: MotionTarget; fetch?: FetchLike } = {}): UiSetup {
   const te = testEnv(over);
   document.body.replaceChildren();
   const root = document.createElement('div');

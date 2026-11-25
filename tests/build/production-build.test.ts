@@ -75,9 +75,17 @@ describe('Precache (F-14: Offline-Start)', () => {
   });
 
   it('JEDE ausgelieferte Datei (außer Service Worker und Workbox-Laufzeit) liegt im Precache', () => {
-    const shipped = files(out).filter((f) => f !== 'sw.js' && !/^workbox-.*\.js$/.test(f) && !f.endsWith('.gitkeep'));
+    // library/* ist bewusst NICHT im Precache, sondern netzwerkbevorzugt (siehe nächster Test).
+    const shipped = files(out).filter((f) => f !== 'sw.js' && !/^workbox-.*\.js$/.test(f) && !f.endsWith('.gitkeep') && !f.startsWith('library/'));
     const missing = shipped.filter((f) => !precache.includes(f));
     expect(missing).toEqual([]);
+  });
+
+  it('gemeinsame Bibliothek: Index wird ausgeliefert, aber nicht vorab gecacht; Laufzeit-Cache ist netzwerkbevorzugt', () => {
+    expect(existsSync(join(out, 'library', 'index.json'))).toBe(true);
+    expect(precache.some((u) => u.startsWith('library/'))).toBe(false);
+    expect(sw).toContain('barq-library');
+    expect(sw).toMatch(/NetworkFirst/);
   });
 
   it('Precache enthält keine absoluten oder externen URLs', () => {

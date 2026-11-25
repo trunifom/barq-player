@@ -13,6 +13,7 @@ import type { Dispose, Route } from '../../app/routes';
 import type { AppContext } from '../../app/container';
 import type { BarcodeItem, Collection } from '../../domain/types';
 import { decodeSharePayload } from '../../adapters/share/link-codec';
+import type { LibraryEntry } from '../../application/library-service';
 import { confirmDialog, formDialog, promptDialog } from '../components/dialog';
 import { statusBadges } from '../components/badges';
 import { downloadText, formatDateTime, h, setChildren } from '../components/dom';
@@ -22,6 +23,16 @@ import { copyCollectionText, downloadBackup, safeFileName, shareCollectionFile, 
 import { SYMBOLOGY_LABEL } from './scanner';
 
 const validateName = (v: string): string | null => (v.trim() === '' ? 'Bitte einen Namen eingeben.' : v.trim().length > 100 ? 'Höchstens 100 Zeichen.' : null);
+
+/**
+ * Dateiname für die Bibliothek: nur Buchstaben, Ziffern, Unterstrich und Bindestrich; „index“ ist reserviert.
+ * @param name - Sammlungsname.
+ * @returns Dateiname mit Endung `.json`.
+ */
+export function libraryFileName(name: string): string {
+  const base = safeFileName(name);
+  return `${base === 'index' ? 'index_sammlung' : base}.json`;
+}
 
 /** Nach so vielen Tagen ohne Sicherung erscheint eine Erinnerung. */
 export const BACKUP_REMINDER_DAYS = 14;
@@ -61,6 +72,86 @@ export function mountCollections(root: HTMLElement, ctx: AppContext, route: Rout
     );
   };
 
+  // ------------------------------------------------------------------ Gemeinsame Bibliothek
+  const libraryBox = h('section', { class: 'card', id: 'co-library', 'aria-labelledby': 'co-lib-title' });
+  const statusText: Record<LibraryEntry['status'], string> = {
+    new: 'Neu',
+    current: 'Aktuell',
+    update: 'Neue Version verfügbar',
+    'update-modified': 'Neue Version – lokal geändert (Aktualisieren überschreibt Ihre Änderungen)',
+    modified: 'Lokal geändert'
+  };
+  const statusTone: Record<LibraryEntry['status'], string> = { new: 'warn', current: 'ok', update: 'warn', 'update-modified': 'warn', modified: 'neutral' };
+
+  const applyEntries = async (entries: readonly LibraryEntry[]): Promise<void> => {
+    try {
+      for (const e of entries) {
+        if (e.status === 'update-modified') {
+          const ok = await confirmDialog({
+            title: 'Lokale Änderungen überschreiben?',
+            message: `Die Sammlung „${e.name}“ wurde auf diesem Gerät geändert. Beim Aktualisieren gehen diese Änderungen verloren und die veröffentlichte Version wird übernommen.`,
+            confirmLabel: 'Überschreiben',
+            danger: true
+          });
+          if (!ok) continue;
+        }
+        await ctx.library.apply(e);
+      }
+      ctx.notify.success('Bibliothek aktualisiert.');
+    } catch (error: unknown) {
+      fail('library-apply')(error);
+    }
+    if (alive) await showList();
+  };
+
+  const loadLibrary = async (): Promise<void> => {
+    setChildren(libraryBox, h('h2', { id: 'co-lib-title' }, 'Gemeinsame Bibliothek'), h('p', { class: 'hint', role: 'status', id: 'co-lib-status' }, 'Bibliothek wird geprüft …'));
+    try {
+      const check = await ctx.library.check(today());
+      if (!alive) return;
+      const actionable = check.entries.filter((e) => e.status === 'new' || e.status === 'update');
+      setChildren(
+        libraryBox,
+        h('h2', { id: 'co-lib-title' }, 'Gemeinsame Bibliothek'),
+        check.entries.length === 0 && check.problems.length === 0
+          ? h('p', { class: 'hint', id: 'co-lib-empty' }, 'Es ist noch keine gemeinsame Bibliothek veröffentlicht. Öffnen Sie eine Sammlung und wählen Sie „In Bibliothek veröffentlichen“, um Ihre Codes mit allen zu teilen, die diese App-Adresse nutzen.')
+          : h('p', { class: 'hint' }, 'Diese Sammlungen werden zusammen mit der App veröffentlicht. Jeder, der die App-Adresse öffnet, kann sie übernehmen – ohne Codes neu zu erfassen.'),
+        check.entries.length > 0
+          ? h(
+              'ul',
+              { class: 'plain-list', id: 'co-lib-list' },
+              ...check.entries.map((e) =>
+                h(
+                  'li',
+                  { class: 'library-row', 'data-library': e.file },
+                  h('strong', null, e.name),
+                  h('span', { class: 'hint' }, ` ${e.itemCount} Code(s)${e.expiredCount > 0 ? `, davon ${e.expiredCount} abgelaufen` : ''} · `),
+                  h('span', { class: `badge badge--${statusTone[e.status]}`, 'data-status': e.status }, statusText[e.status]),
+                  e.status === 'new' || e.status === 'update' || e.status === 'update-modified'
+                    ? h('button', { type: 'button', class: 'btn', 'data-library-apply': e.file, onclick: () => void applyEntries([e]) }, e.status === 'new' ? 'Übernehmen' : 'Aktualisieren')
+                    : null
+                )
+              )
+            )
+          : null,
+        actionable.length > 1 ? h('button', { type: 'button', class: 'btn btn--primary', id: 'co-lib-all', onclick: () => void applyEntries(actionable) }, `Alle ${actionable.length} übernehmen bzw. aktualisieren`) : null,
+        check.problems.length > 0 ? h('ul', { class: 'errors', id: 'co-lib-problems' }, ...check.problems.map((pr) => h('li', null, `${pr.file}: ${pr.message}`))) : null,
+        h('button', { type: 'button', class: 'btn', id: 'co-lib-refresh', onclick: () => void loadLibrary() }, 'Auf Updates prüfen')
+      );
+    } catch (error: unknown) {
+      if (!alive) return;
+      const message = error instanceof AppError ? error.userMessage : 'Die Bibliothek konnte nicht geprüft werden.';
+      setChildren(
+        libraryBox,
+        h('h2', { id: 'co-lib-title' }, 'Gemeinsame Bibliothek'),
+        h('p', { class: 'hint', id: 'co-lib-error' }, `${message} Bereits übernommene Sammlungen bleiben nutzbar.`),
+        h('button', { type: 'button', class: 'btn', id: 'co-lib-refresh', onclick: () => void loadLibrary() }, 'Erneut prüfen')
+      );
+      // Offline ist ein erwarteter Zustand und wird nicht als Fehler protokolliert.
+      if (!(error instanceof AppError && error.code === 'ERR_LIBRARY_UNAVAILABLE')) ctx.logger.logError(error, { source: 'library-check' });
+    }
+  };
+
   // ------------------------------------------------------------------ Liste
   const showList = async (): Promise<void> => {
     openId = null;
@@ -73,6 +164,7 @@ export function mountCollections(root: HTMLElement, ctx: AppContext, route: Rout
           'li',
           { class: 'card collection-row' },
           h('button', { type: 'button', class: 'link-btn', 'data-open': c.id, onclick: () => void showDetail(c.id) }, h('strong', null, c.name)),
+          c.library ? h('span', { class: 'badge badge--neutral', 'data-badge': 'library', title: `Aus der gemeinsamen Bibliothek: ${c.library.file}` }, 'Bibliothek') : null,
           h('span', { class: 'hint' }, `${counts[i] ?? 0} Position(en) · geändert ${formatDateTime(c.updatedAt)}`),
           h(
             'div',
@@ -93,8 +185,10 @@ export function mountCollections(root: HTMLElement, ctx: AppContext, route: Rout
           h('button', { type: 'button', class: 'btn btn--primary', id: 'co-new', onclick: () => void create() }, 'Neue Sammlung'),
           h('button', { type: 'button', class: 'btn', id: 'co-import', onclick: () => void runImport() }, 'Importieren')
         ),
-        cols.length === 0 ? h('p', { class: 'hint', id: 'co-empty' }, 'Noch keine Sammlung vorhanden.') : h('ul', { class: 'plain-list', id: 'co-list' }, ...rows)
+        cols.length === 0 ? h('p', { class: 'hint', id: 'co-empty' }, 'Noch keine Sammlung vorhanden.') : h('ul', { class: 'plain-list', id: 'co-list' }, ...rows),
+        libraryBox
       );
+      void loadLibrary();
     } catch (error: unknown) {
       fail('collections-list')(error);
     }
@@ -260,6 +354,8 @@ export function mountCollections(root: HTMLElement, ctx: AppContext, route: Rout
           h('button', { type: 'button', class: 'btn', id: 'co-link', onclick: () => void shareCollectionLink(ctx, id) }, 'Teilen (Link)'),
           h('button', { type: 'button', class: 'btn', id: 'co-text', onclick: () => void copyCollectionText(ctx, id) }, 'Als Text kopieren'),
           h('button', { type: 'button', class: 'btn', id: 'co-csv', onclick: () => void exportCsv(id, col.name) }, 'CSV exportieren'),
+          h('button', { type: 'button', class: 'btn', id: 'co-publish', onclick: () => void publishToLibrary(id, col.name) }, 'In Bibliothek veröffentlichen'),
+          col.library ? h('button', { type: 'button', class: 'btn', id: 'co-detach', title: 'Die Sammlung bleibt als eigene Kopie erhalten und wird nicht mehr aus der Bibliothek aktualisiert', onclick: () => void detach(id) }, 'Von Bibliothek lösen') : null,
           h('button', { type: 'button', class: 'btn', id: 'co-import', onclick: () => void runImport() }, 'Importieren'),
           h('button', { type: 'button', class: 'btn', id: 'co-json', onclick: () => void downloadBackup(ctx) }, 'Backup (JSON)')
         ),
@@ -311,6 +407,44 @@ export function mountCollections(root: HTMLElement, ctx: AppContext, route: Rout
       }
     });
     if (ok && openId) await showDetail(openId);
+  };
+
+  const detach = async (id: string): Promise<void> => {
+    try {
+      await ctx.collections.detachLibrary(id);
+      ctx.notify.success('Die Sammlung ist jetzt eine eigene Kopie und wird nicht mehr aktualisiert.');
+      await showDetail(id);
+    } catch (error: unknown) {
+      fail('collections-detach')(error);
+    }
+  };
+
+  const publishToLibrary = async (id: string, name: string): Promise<void> => {
+    try {
+      const { json } = await ctx.backup.exportCollectionShare(id);
+      const fileName = libraryFileName(name);
+      downloadText(fileName, json, 'application/json');
+      await confirmDialog({
+        title: 'In Bibliothek veröffentlichen',
+        confirmLabel: 'Verstanden',
+        cancelLabel: 'Schließen',
+        message: h(
+          'div',
+          { id: 'co-publish-steps' },
+          h('p', null, `Die Datei „${fileName}“ wurde heruntergeladen. So erreicht sie alle, die diese App nutzen:`),
+          h(
+            'ol',
+            null,
+            h('li', null, 'Öffnen Sie Ihr Repository auf GitHub und dort den Ordner „public/library“.'),
+            h('li', null, 'Wählen Sie „Add file → Upload files“, legen Sie die Datei hinein und bestätigen Sie mit „Commit changes“. Eine Datei mit gleichem Namen wird dabei ersetzt (= Aktualisierung).'),
+            h('li', null, 'Nach ein bis zwei Minuten (Lauf „Veröffentlichen“ unter „Actions“) erscheint die Sammlung bei allen unter „Sammlungen → Gemeinsame Bibliothek“ zum Übernehmen.')
+          ),
+          h('p', { class: 'field__error', id: 'co-publish-warning' }, 'Achtung: Die Bibliothek ist öffentlich lesbar. Jeder, der die App-Adresse kennt, kann diese Codes samt Wort, Nutzen, Notiz und Tags lesen. Veröffentlichen Sie nichts Vertrauliches.')
+        )
+      });
+    } catch (error: unknown) {
+      fail('collections-publish')(error);
+    }
   };
 
   const checkCatalog = async (id: string): Promise<void> => {

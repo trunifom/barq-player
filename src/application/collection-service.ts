@@ -17,6 +17,7 @@ import type {
   Collection,
   FaderProfile,
   ItemSource,
+  LibraryLink,
   SequenceTemplate,
   Symbology
 } from '../domain/types';
@@ -423,12 +424,17 @@ export class CollectionService {
    * Importiert eine geteilte Sammlung als NEUE Sammlung (vorhandene Daten bleiben unberührt; bei Namensgleichheit
    * wird ` (2)` angehängt). Scheitert das Speichern der Codes, wird die neue Sammlung wieder entfernt.
    * @param file - geprüfte Austauschdatei.
+   * @param library - optional: Verknüpfung mit einer Bibliotheksdatei (für spätere Updates).
    * @returns neue Sammlung und Anzahl Codes.
    * @throws {AppError} `ERR_SYNTAX_INVALID`/`ERR_CHECKSUM_INVALID` (kann bei geprüften Dateien nicht vorkommen), `ERR_STORAGE_*`.
    */
-  async importShare(file: ShareFile): Promise<ShareImportResult> {
-    const collection = await this.createCollection(await this.uniqueCollectionName(file.collection.name));
+  async importShare(file: ShareFile, library?: LibraryLink): Promise<ShareImportResult> {
+    let collection = await this.createCollection(await this.uniqueCollectionName(file.collection.name));
     try {
+      if (library) {
+        collection = { ...collection, library };
+        await guardWrite(() => this.db.collections.put(collection));
+      }
       await this.addItems(
         collection.id,
         file.items.map((i) => ({ ...i, source: 'import' as const })),
@@ -440,6 +446,48 @@ export class CollectionService {
       throw error;
     }
     return { collection, items: file.items.length };
+  }
+
+  /**
+   * Ersetzt den Inhalt einer Bibliotheks-Sammlung durch die veröffentlichte Version (atomar: alles oder nichts).
+   * Die Sammlung behält ID und lokalen Namen; lokale Änderungen an den Codes gehen verloren.
+   * @param collectionId - lokale Sammlung.
+   * @param file - geprüfte Austauschdatei.
+   * @param library - neue Verknüpfung (Fingerabdruck der übernommenen Version).
+   * @returns aktualisierte Sammlung und Anzahl Codes.
+   * @throws {AppError} `ERR_NOT_FOUND`, `ERR_STORAGE_*`.
+   */
+  async replaceFromShare(collectionId: string, file: ShareFile, library: LibraryLink): Promise<ShareImportResult> {
+    return guardWrite(() =>
+      this.db.transaction('rw', this.db.collections, this.db.items, async () => {
+        await this.requireCollection(collectionId);
+        await this.db.items.where('collectionId').equals(collectionId).delete();
+        await this.addItems(
+          collectionId,
+          file.items.map((i) => ({ ...i, source: 'import' as const })),
+          'append'
+        );
+        const updated: Collection = { ...(await this.requireCollection(collectionId)), library };
+        await this.db.collections.put(updated);
+        return { collection: updated, items: file.items.length };
+      })
+    );
+  }
+
+  /**
+   * Löst eine Sammlung von der Bibliothek: Sie bleibt als eigene Sammlung erhalten und wird nicht mehr aktualisiert.
+   * @param collectionId - Sammlung.
+   * @throws {AppError} `ERR_NOT_FOUND`, `ERR_STORAGE_*`.
+   */
+  async detachLibrary(collectionId: string): Promise<void> {
+    await guardWrite(() =>
+      this.db.transaction('rw', this.db.collections, async () => {
+        const c = await this.requireCollection(collectionId);
+        const next: Collection = { ...c };
+        delete next.library;
+        await this.db.collections.put(next);
+      })
+    );
   }
 
   // ------------------------------------------------------------ Artikelstamm

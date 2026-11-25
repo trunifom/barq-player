@@ -16,6 +16,7 @@ import { BackupService } from '../application/backup-service';
 import { CaptureService } from '../application/capture-service';
 import { CollectionService } from '../application/collection-service';
 import { ImportService } from '../application/import-service';
+import { LibraryService, type FetchLike } from '../application/library-service';
 import { InstallPrompt } from '../offline/install-prompt';
 import { PlaybackController } from '../application/playback-service';
 import { SessionService } from '../application/session-service';
@@ -48,6 +49,8 @@ export interface AppContext {
   readonly install: InstallPrompt;
   /** Import aus Dateien, Text und Links. */
   readonly importer: ImportService;
+  /** Gemeinsame Bibliothek (Sammlungen, die mit der App veröffentlicht werden). */
+  readonly library: LibraryService;
   /** Browser-Speicherverwaltung (`navigator.storage`), falls vorhanden. */
   readonly storageManager: StorageManagerLike | undefined;
   /** Aktueller Decoder (wird bei geänderter Format-Whitelist ersetzt). */
@@ -78,6 +81,8 @@ export interface AppOverrides {
   liftNow?: () => number;
   scheduler?: Scheduler;
   noticeTimers?: NoticeTimers;
+  /** Abfragefunktion für die Bibliothek (Standard: `fetch` des Fensters). */
+  fetch?: FetchLike;
   newId?: () => string;
   nowIso?: () => string;
   nowMs?: () => number;
@@ -163,6 +168,11 @@ export function createAppContext(env: AppEnvironment): AppContext {
     }
   });
   const importer = new ImportService(db, APP_VERSION, deps);
+  const library = new LibraryService(
+    db,
+    o.fetch ?? ((url, init) => env.win.fetch(url, init)),
+    deps
+  );
 
   let decoder: HybridDecoder;
   let capture: CaptureService;
@@ -192,6 +202,7 @@ export function createAppContext(env: AppEnvironment): AppContext {
     updates,
     install,
     importer,
+    library,
     storageManager: 'storageManager' in o ? o.storageManager : (env.win.navigator as { storage?: StorageManagerLike }).storage,
     getDecoder: () => decoder,
     getCapture: () => capture,
