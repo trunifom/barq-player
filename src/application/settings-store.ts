@@ -4,6 +4,7 @@
  * Nur Komfort: Zugriffe sind abgesichert (Privatmodus, gesperrter Speicher, kaputtes JSON); Fehler führen nie zum
  * Abbruch, sondern zu Standardwerten bzw. zum Weiterarbeiten im Arbeitsspeicher. Sachdaten gehören in IndexedDB.
  */
+import { CAMERA_RESOLUTIONS, type CameraResolution } from '../domain/camera-controls';
 import { DEFAULT_WHITELIST } from '../domain/detection';
 import type { PlaybackMode } from '../domain/playback-machine';
 import type { Symbology } from '../domain/types';
@@ -29,6 +30,10 @@ export interface AppSettings {
   liftToPause: boolean;
   /** Zeitpunkt der letzten Sicherung (ISO) oder `null` (für die Erinnerung an regelmäßige Backups). */
   lastBackupAt: string | null;
+  /** Kameraauflösung (höher = kleine Codes besser lesbar, aber mehr Rechenzeit). */
+  cameraResolution: CameraResolution;
+  /** Zuletzt gewählter Zoomfaktor der Kamera (1 = kein Zoom). */
+  cameraZoom: number;
 }
 
 /** Alle wählbaren Formate in fester Reihenfolge. */
@@ -46,7 +51,9 @@ export const DEFAULT_SETTINGS: Readonly<AppSettings> = Object.freeze({
   sound: true,
   vibration: true,
   liftToPause: false,
-  lastBackupAt: null
+  lastBackupAt: null,
+  cameraResolution: 'high',
+  cameraZoom: 1
 });
 
 /** Minimale Speicherschnittstelle. */
@@ -88,7 +95,9 @@ export function sanitizeSettings(raw: unknown): AppSettings {
     sound: bool(r['sound'], d.sound),
     vibration: bool(r['vibration'], d.vibration),
     liftToPause: bool(r['liftToPause'], d.liftToPause),
-    lastBackupAt: typeof r['lastBackupAt'] === 'string' && !Number.isNaN(new Date(r['lastBackupAt']).getTime()) ? r['lastBackupAt'] : null
+    lastBackupAt: typeof r['lastBackupAt'] === 'string' && !Number.isNaN(new Date(r['lastBackupAt']).getTime()) ? r['lastBackupAt'] : null,
+    cameraResolution: CAMERA_RESOLUTIONS.includes(r['cameraResolution'] as CameraResolution) ? (r['cameraResolution'] as CameraResolution) : d.cameraResolution,
+    cameraZoom: typeof r['cameraZoom'] === 'number' && Number.isFinite(r['cameraZoom']) && r['cameraZoom'] >= 1 && r['cameraZoom'] <= 20 ? r['cameraZoom'] : d.cameraZoom
   };
 }
 

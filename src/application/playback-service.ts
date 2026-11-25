@@ -39,6 +39,8 @@ export interface PlaybackRequest {
   calibration?: boolean;
   /** `true`: abgelaufene Codes trotzdem abspielen (Standard: überspringen). */
   includeExpired?: boolean;
+  /** Nur diese Positionen (Eintrags-IDs) abspielen; ohne Angabe die ganze Sammlung. Die Reihenfolge der Sammlung bleibt erhalten. */
+  itemIds?: readonly string[];
 }
 
 /** Vorbereitete (noch nicht gestartete) Sitzung. */
@@ -107,7 +109,14 @@ export class PlaybackController {
     }
     const collection = (await this.deps.collections.listCollections()).find((c) => c.id === request.collectionId);
     if (!collection) throw new AppError('ERR_NOT_FOUND', { details: `Sammlung ${request.collectionId}`, userMessage: 'Die Sammlung existiert nicht (mehr).' });
-    const allItems = await this.deps.collections.listItems(request.collectionId);
+    let allItems = await this.deps.collections.listItems(request.collectionId);
+    if (request.itemIds !== undefined && request.calibration !== true) {
+      const wanted = new Set(request.itemIds);
+      allItems = allItems.filter((i) => wanted.has(i.id));
+      if (allItems.length === 0) {
+        throw new AppError('ERR_PLAYBACK_FAILED', { details: 'Auswahl leer', userMessage: 'Es ist kein Code ausgewählt. Wählen Sie mindestens einen Code zum Abspielen aus.' });
+      }
+    }
     let items = allItems;
     let skippedExpired = 0;
     if (request.calibration !== true && request.includeExpired !== true) {
@@ -168,6 +177,12 @@ export class PlaybackController {
       mode: request.mode,
       appVersion: this.deps.appVersion,
       ...(request.profile.id ? { profileId: request.profile.id } : {}),
+      timing: {
+        displayMs: request.profile.displayMs,
+        blankMs: request.profile.blankMs,
+        identicalBlankMs: request.profile.identicalBlankMs,
+        startDelayMs: request.profile.startDelayMs
+      },
       entryCount: prepared.entries.length,
       interleaved: request.interleave && prepared.stats.reordered,
       status: 'running'

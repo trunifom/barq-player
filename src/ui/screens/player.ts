@@ -11,11 +11,14 @@
 import { ERROR_CATALOG } from '../../domain/errors';
 import { evaluateCalibration, CALIBRATION_SHOWN, type CalibrationResult } from '../../domain/calibration';
 import type { PlaybackMachine, PlaybackMode, PlaybackSnapshot, ResumeDecision } from '../../domain/playback-machine';
-import type { FaderProfile } from '../../domain/types';
+import { expiryInfo, localDateString } from '../../domain/expiry';
+import { collectTags, matchesQuery } from '../../domain/item-meta';
+import { MIN_BLANK_MS } from '../../domain/profiles';
+import type { BarcodeItem, FaderProfile } from '../../domain/types';
 import type { AppContext } from '../../app/container';
 import type { Dispose, Route } from '../../app/routes';
 import type { PreparedPlayback } from '../../application/playback-service';
-import { confirmDialog } from '../components/dialog';
+import { confirmDialog, promptDialog } from '../components/dialog';
 import { h, setChildren, svgElement } from '../components/dom';
 
 /** Höhe der Steuerleiste in CSS-Pixeln (die Bühne ist die Fensterhöhe abzüglich dieser Leiste). */
@@ -80,6 +83,22 @@ function mountSetup(root: HTMLElement, ctx: AppContext, route: Route, calibratio
   const interleave = h('input', { id: 'pl-interleave', type: 'checkbox', checked: s.interleave });
   const startIndex = h('input', { id: 'pl-start', class: 'input', type: 'number', min: 1, value: 1 });
   const includeExpired = h('input', { id: 'pl-include-expired', type: 'checkbox' });
+
+  // ---- Zeiten für diesen Lauf (vorbelegt aus dem Profil, einzeln anpassbar)
+  const timeInput = (id: string, min: number): HTMLInputElement => h('input', { id, class: 'input', type: 'number', min, step: 50, inputmode: 'numeric' });
+  const displayInput = timeInput('pl-display', 1);
+  const blankInput = timeInput('pl-blank', MIN_BLANK_MS);
+  const identicalInput = timeInput('pl-identical', MIN_BLANK_MS);
+  const delayInput = timeInput('pl-delay', 0);
+  const saveProfileBtn = h('button', { type: 'button', class: 'btn', id: 'pl-save-profile' }, 'Als neues Profil speichern');
+
+  // ---- Auswahl der abzuspielenden Codes
+  let items: BarcodeItem[] = [];
+  const selected = new Set<string>();
+  const filterText = h('input', { id: 'pl-filter-text', class: 'input', type: 'search', placeholder: 'Suchen (Code, Wort, Nutzen, Satz, Tag)', 'aria-label': 'Codes suchen' });
+  const filterTag = h('select', { id: 'pl-filter-tag', class: 'input', 'aria-label': 'Nach Tag filtern' });
+  const pickList = h('div', { class: 'pick-list', id: 'pl-items', role: 'group', 'aria-label': 'Codes zum Abspielen' });
+  const selCount = h('p', { class: 'hint', id: 'pl-sel-count', role: 'status' });
   const summary = h('div', { class: 'summary', 'aria-live': 'polite' });
   const startBtn = h('button', { type: 'button', class: 'btn btn--primary btn--big', id: 'pl-start-btn' }, calibration ? 'Kalibrierlauf starten' : 'Start');
   let profiles: FaderProfile[] = [];
@@ -90,22 +109,122 @@ function mountSetup(root: HTMLElement, ctx: AppContext, route: Route, calibratio
       const [cols, profs] = await Promise.all([ctx.collections.listCollections(), ctx.collections.listProfiles()]);
       if (!alive) return;
       profiles = profs;
-      const wanted = route.params['collection'] ?? s.collectionId ?? cols[0]?.id;
+      const cur = ctx.settings.get();
+      const wanted = route.params['collection'] ?? cur.collectionId ?? cols[0]?.id;
       setChildren(collectionSelect, ...cols.map((c) => h('option', { value: c.id, selected: c.id === wanted }, c.name)));
-      const wantedProfile = s.profileId && profs.some((p) => p.id === s.profileId) ? s.profileId : profs.find((p) => p.id === 'profile-normal')?.id ?? profs[0]?.id;
+      const wantedProfile = cur.profileId && profs.some((p) => p.id === cur.profileId) ? cur.profileId : profs.find((p) => p.id === 'profile-normal')?.id ?? profs[0]?.id;
       setChildren(profileSelect, ...profs.map((p) => h('option', { value: p.id, selected: p.id === wantedProfile }, `${p.name} – ${p.displayMs}/${p.blankMs} ms`)));
       if (cols.length === 0) setChildren(summary, h('p', { class: 'hint' }, 'Es gibt noch keine Sammlung. Legen Sie zuerst unter „Erfassen“ oder „Sammlungen“ eine an.'));
       startBtn.disabled = cols.length === 0;
+      syncTimes();
+      await loadItems();
     } catch (error: unknown) {
       ctx.notify.error(error, { source: 'player-setup' });
     }
   };
 
+  /** Übernimmt die Zeiten des gewählten Profils in die Eingabefelder. */
+  const syncTimes = (): void => {
+    const p = profiles.find((x) => x.id === profileSelect.value);
+    if (!p) return;
+    displayInput.value = String(p.displayMs);
+    blankInput.value = String(p.blankMs);
+    identicalInput.value = String(p.identicalBlankMs);
+    delayInput.value = String(p.startDelayMs);
+  };
+
+  /** Aktuelles Profil mit den (ggf. geänderten) Zeiten aus den Eingabefeldern. */
+  const effectiveProfile = (): FaderProfile | undefined => {
+    const base = profiles.find((p) => p.id === profileSelect.value);
+    if (!base || calibration) return base;
+    return { ...base, displayMs: Number(displayInput.value), blankMs: Number(blankInput.value), identicalBlankMs: Number(identicalInput.value), startDelayMs: Number(delayInput.value) };
+  };
+
+  const today = (): string => localDateString(new Date(ctx.nowIso()));
+  const visibleItems = (): BarcodeItem[] => items.filter((i) => matchesQuery(i, filterText.value) && (filterTag.value === '' || (i.tags ?? []).includes(filterTag.value)));
+
+  const updateCount = (): void => {
+    const total = items.reduce((n, i) => (selected.has(i.id) ? n + i.quantity : n), 0);
+    selCount.textContent = items.length === 0 ? 'Die Sammlung enthält keine Codes.' : `${selected.size} von ${items.length} Position(en) ausgewählt (${total} Stück).`;
+  };
+
+  const renderItems = (): void => {
+    const now = today();
+    const shown = visibleItems();
+    setChildren(
+      pickList,
+      shown.length === 0
+        ? h('p', { class: 'hint' }, items.length === 0 ? 'Keine Codes in dieser Sammlung.' : 'Keine Position passt zu Suche und Filter.')
+        : null,
+      ...shown.map((i) => {
+        const expired = expiryInfo(i.expiresAt, now).state === 'expired';
+        const box = h('input', { type: 'checkbox', 'data-item-id': i.id, checked: selected.has(i.id) });
+        box.addEventListener('change', () => {
+          if (box.checked) selected.add(i.id);
+          else selected.delete(i.id);
+          updateCount();
+        });
+        return h(
+          'label',
+          { class: `pick-row${expired ? ' row--expired' : ''}` },
+          box,
+          h('code', { class: 'value' }, i.value.length > 40 ? `${i.value.slice(0, 40)}…` : i.value),
+          i.label ? h('span', { class: 'item-label' }, ` ${i.label}`) : null,
+          i.quantity > 1 ? h('span', { class: 'hint' }, ` ×${i.quantity}`) : null,
+          expired ? h('span', { class: 'badge badge--bad' }, 'abgelaufen') : null
+        );
+      })
+    );
+    updateCount();
+  };
+
+  const loadItems = async (): Promise<void> => {
+    const id = collectionSelect.value;
+    items = id ? await ctx.collections.listItems(id) : [];
+    if (!alive) return;
+    selected.clear();
+    for (const i of items) selected.add(i.id);
+    filterText.value = '';
+    setChildren(filterTag, h('option', { value: '' }, 'Alle Tags'), ...collectTags(items).map((t) => h('option', { value: t }, `#${t}`)));
+    renderItems();
+  };
+
+  collectionSelect.addEventListener('change', () => void loadItems().catch((error: unknown) => ctx.notify.error(error, { source: 'player-items' })));
+  profileSelect.addEventListener('change', syncTimes);
+  filterText.addEventListener('input', renderItems);
+  filterTag.addEventListener('change', renderItems);
+  const selectIds = (ids: readonly string[]): void => {
+    selected.clear();
+    for (const id of ids) selected.add(id);
+    renderItems();
+  };
+
+  saveProfileBtn.addEventListener('click', () => {
+    void (async () => {
+      const base = profiles.find((p) => p.id === profileSelect.value);
+      const name = await promptDialog({ title: 'Als neues Profil speichern', label: 'Name des Profils', confirmLabel: 'Speichern', validate: (v) => (v.trim() === '' ? 'Bitte einen Namen eingeben.' : v.trim().length > 100 ? 'Höchstens 100 Zeichen.' : null) });
+      if (name === null || !base) return;
+      try {
+        const profile: FaderProfile = { id: `profile-${ctx.nowIso().replace(/\D/g, '')}`, name: name.trim(), displayMs: Number(displayInput.value), blankMs: Number(blankInput.value), identicalBlankMs: Number(identicalInput.value), startDelayMs: Number(delayInput.value) };
+        await ctx.collections.saveProfile(profile);
+        ctx.settings.update({ collectionId: collectionSelect.value || null, profileId: profile.id });
+        ctx.notify.success(`Profil „${profile.name}“ gespeichert.`);
+        await fill();
+      } catch (error: unknown) {
+        ctx.notify.error(error, { source: 'player-save-profile' });
+      }
+    })();
+  });
+
   const start = async (): Promise<void> => {
     const collectionId = collectionSelect.value;
-    const profile = profiles.find((p) => p.id === profileSelect.value);
+    const profile = effectiveProfile();
     if (!collectionId || !profile) {
       ctx.notify.error(new Error('Sammlung oder Profil fehlt'), { source: 'player-setup' });
+      return;
+    }
+    if (!calibration && items.length > 0 && selected.size === 0) {
+      setChildren(summary, h('p', { class: 'field__error', role: 'alert', id: 'pl-none-selected' }, 'Es ist kein Code ausgewählt. Wählen Sie mindestens einen Code zum Abspielen aus.'));
       return;
     }
     const mode = calibration ? 'auto' : (modeSelect.value as PlaybackMode);
@@ -128,7 +247,8 @@ function mountSetup(root: HTMLElement, ctx: AppContext, route: Route, calibratio
         viewport: { width: m.width, height: Math.max(1, m.height - PLAYER_BAR_HEIGHT) },
         devicePixelRatio: m.devicePixelRatio,
         ...(calibration ? { calibration: true } : {}),
-        ...(includeExpired.checked ? { includeExpired: true } : {})
+        ...(includeExpired.checked ? { includeExpired: true } : {}),
+        ...(!calibration && selected.size < items.length ? { itemIds: [...selected] } : {})
       });
       setChildren(
         summary,
@@ -156,7 +276,38 @@ function mountSetup(root: HTMLElement, ctx: AppContext, route: Route, calibratio
         ? h('p', { class: 'hint' }, `Es werden genau ${CALIBRATION_SHOWN} Testpositionen aus der gewählten Sammlung angezeigt (bei weniger Codes zyklisch wiederholt). Verwenden Sie nur Artikel, die Ihre Kasse kennt, und einen freigegebenen Testprozess.`)
         : null,
       h('div', { class: 'field' }, h('label', { for: 'pl-collection' }, calibration ? 'Testsammlung' : 'Sammlung'), collectionSelect),
+      calibration
+        ? null
+        : h(
+            'details',
+            { class: 'card', id: 'pl-pick', open: true },
+            h('summary', null, 'Welche Codes abspielen?'),
+            h('p', { class: 'hint' }, 'Standardmäßig läuft die ganze Sammlung. Wählen Sie hier einzelne Codes aus, filtern Sie nach Tag oder suchen Sie. Die Reihenfolge der Sammlung bleibt erhalten.'),
+            h('div', { class: 'filters' }, filterText, filterTag),
+            h(
+              'div',
+              { class: 'btn-row' },
+              h('button', { type: 'button', class: 'btn', id: 'pl-sel-all', onclick: () => selectIds(items.map((i) => i.id)) }, 'Alle'),
+              h('button', { type: 'button', class: 'btn', id: 'pl-sel-none', onclick: () => selectIds([]) }, 'Keine'),
+              h('button', { type: 'button', class: 'btn', id: 'pl-sel-visible', onclick: () => selectIds(visibleItems().map((i) => i.id)) }, 'Nur die gefilterten')
+            ),
+            selCount,
+            pickList
+          ),
       h('div', { class: 'field' }, h('label', { for: 'pl-profile' }, 'Scannerprofil'), profileSelect),
+      calibration
+        ? null
+        : h(
+            'details',
+            { class: 'card', id: 'pl-times', open: true },
+            h('summary', null, 'Zeiten für diesen Lauf (in Millisekunden)'),
+            h('p', { class: 'hint' }, 'Vorbelegt aus dem gewählten Profil. Änderungen gelten nur für diesen Lauf, bis Sie sie als neues Profil speichern. 1000 ms = 1 Sekunde.'),
+            h('div', { class: 'field' }, h('label', { for: 'pl-display' }, 'Anzeigezeit: so lange ist ein Code sichtbar'), displayInput),
+            h('div', { class: 'field' }, h('label', { for: 'pl-blank' }, `Zeit zwischen zwei Codes (leeres Bild, mind. ${MIN_BLANK_MS} ms)`), blankInput),
+            h('div', { class: 'field' }, h('label', { for: 'pl-identical' }, `Zeit vor einem identischen Folgecode (mind. ${MIN_BLANK_MS} ms)`), identicalInput),
+            h('div', { class: 'field' }, h('label', { for: 'pl-delay' }, 'Startverzögerung (Zeit, um das Telefon an den Scanner zu halten)'), delayInput),
+            saveProfileBtn
+          ),
       calibration
         ? null
         : h(

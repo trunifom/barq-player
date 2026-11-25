@@ -59,7 +59,7 @@ describe('Setup', () => {
   it('ohne Sammlung: Hinweis, Start gesperrt', async () => {
     ui = setupUi();
     await openSetup(ui);
-    expect(text(ui.root, '.hint')).toContain('noch keine Sammlung');
+    expect(text(ui.root, '.summary .hint')).toContain('noch keine Sammlung');
     expect((ui.root.querySelector('#pl-start-btn') as HTMLButtonElement).disabled).toBe(true);
   });
 

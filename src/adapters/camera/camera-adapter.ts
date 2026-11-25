@@ -5,6 +5,7 @@
  * ohne echte Kamera testbar ist. `track.stop()` wird bei jedem Beenden und vor jedem Kamerawechsel aufgerufen
  * (Android kann nicht zwei Kameras gleichzeitig öffnen).
  */
+import { clampToRange, parseRange, supportedFocusModes, type CapabilityRange, type FocusMode } from '../../domain/camera-controls';
 import { AppError, isAppError } from '../../domain/errors';
 
 /** Minimale Sicht auf `MediaStreamTrack`. */
@@ -28,8 +29,15 @@ export interface MediaDevicesLike {
   enumerateDevices?(): Promise<ReadonlyArray<{ deviceId: string; kind: string; label: string }>>;
 }
 
+/** Minimale Sicht auf `ImageCapture` (hochauflösende Fotos). */
+export interface ImageCaptureLike {
+  takePhoto(): Promise<Blob>;
+}
+
 /** Umgebung des Adapters. */
 export interface CameraEnvironment {
+  /** Erzeugt einen `ImageCapture` für die Videospur; `undefined`, wenn der Browser ihn nicht kennt. */
+  createImageCapture?: ((track: MediaTrackLike) => ImageCaptureLike) | undefined;
   mediaDevices: MediaDevicesLike | undefined;
   /** `window.isSecureContext` (HTTPS oder localhost). */
   isSecureContext: boolean;
@@ -54,6 +62,17 @@ export interface CameraSession {
   facingMode: string | undefined;
   deviceId: string | undefined;
   torchSupported: boolean;
+  /** Zoombereich der Kamera (Faktor), `null` ohne Hardware-Zoom. */
+  zoom: CapabilityRange | null;
+  /** Unterstützte Fokusmodi (leer, wenn die Kamera keine Fokussteuerung anbietet). */
+  focusModes: FocusMode[];
+  /** Bereich der manuellen Fokusentfernung, `null` ohne Unterstützung. */
+  focusDistance: CapabilityRange | null;
+  /** Bereich der Belichtungskorrektur (EV), `null` ohne Unterstützung. */
+  exposure: CapabilityRange | null;
+  /** Tatsächliche Auflösung laut Einstellungen, falls bekannt. */
+  width: number | undefined;
+  height: number | undefined;
 }
 
 /**
@@ -61,7 +80,9 @@ export interface CameraSession {
  * @returns Umgebung mit `mediaDevices` (kann in unsicheren Kontexten `undefined` sein).
  */
 export function browserCameraEnvironment(): CameraEnvironment {
+  const ImageCaptureCtor = (globalThis as { ImageCapture?: new (track: unknown) => ImageCaptureLike }).ImageCapture;
   return {
+    createImageCapture: ImageCaptureCtor ? (track) => new ImageCaptureCtor(track) : undefined,
     mediaDevices: typeof navigator !== 'undefined' ? navigator.mediaDevices : undefined,
     isSecureContext: typeof window !== 'undefined' ? window.isSecureContext : false
   };
@@ -152,15 +173,21 @@ export class CameraAdapter {
       for (const t of stream.getTracks()) t.stop();
       throw new AppError('ERR_CAMERA_NOT_FOUND', { details: 'Stream ohne Videospur' });
     }
-    const settings = (track.getSettings?.() ?? {}) as { facingMode?: unknown; deviceId?: unknown };
-    const capabilities = (track.getCapabilities?.() ?? {}) as { torch?: unknown };
+    const settings = (track.getSettings?.() ?? {}) as { facingMode?: unknown; deviceId?: unknown; width?: unknown; height?: unknown };
+    const capabilities = (track.getCapabilities?.() ?? {}) as { torch?: unknown; zoom?: unknown; focusMode?: unknown; focusDistance?: unknown; exposureCompensation?: unknown };
     this.lastOptions = options;
     this.session = {
       stream,
       track,
       facingMode: typeof settings.facingMode === 'string' ? settings.facingMode : undefined,
       deviceId: typeof settings.deviceId === 'string' ? settings.deviceId : undefined,
-      torchSupported: capabilities.torch === true
+      torchSupported: capabilities.torch === true,
+      zoom: parseRange(capabilities.zoom),
+      focusModes: supportedFocusModes(capabilities.focusMode),
+      focusDistance: parseRange(capabilities.focusDistance),
+      exposure: parseRange(capabilities.exposureCompensation),
+      width: typeof settings.width === 'number' ? settings.width : undefined,
+      height: typeof settings.height === 'number' ? settings.height : undefined
     };
     return this.session;
   }
@@ -262,6 +289,97 @@ export class CameraAdapter {
       await session.track.applyConstraints({ advanced: [{ torch: on } as MediaTrackConstraintSet] });
     } catch (error: unknown) {
       throw new AppError('ERR_CAMERA_UNSUPPORTED', { details: error instanceof Error ? `${error.name}: ${error.message}` : String(error), cause: error, userMessage: 'Die Taschenlampe konnte nicht geschaltet werden.' });
+    }
+  }
+
+  private async applyAdvanced(constraint: Record<string, unknown>, what: string): Promise<void> {
+    const session = this.session;
+    if (!session?.track.applyConstraints) {
+      throw new AppError('ERR_CAMERA_UNSUPPORTED', { details: `${what}: keine Kamera`, userMessage: `${what} ist nicht verfügbar (Kamera nicht gestartet).` });
+    }
+    try {
+      await session.track.applyConstraints({ advanced: [constraint as MediaTrackConstraintSet] });
+    } catch (error: unknown) {
+      throw new AppError('ERR_CAMERA_UNSUPPORTED', { details: error instanceof Error ? `${error.name}: ${error.message}` : String(error), cause: error, userMessage: `${what} konnte nicht eingestellt werden.` });
+    }
+  }
+
+  /**
+   * Stellt den Hardware-Zoom ein (der Wert wird auf den Bereich der Kamera begrenzt).
+   * @param value - gewünschter Zoomfaktor.
+   * @returns tatsächlich angewendeter Faktor.
+   * @throws {AppError} `ERR_CAMERA_UNSUPPORTED`, wenn die Kamera keinen Zoom bietet oder die Einstellung scheitert.
+   */
+  async setZoom(value: number): Promise<number> {
+    const range = this.session?.zoom;
+    if (!range) throw new AppError('ERR_CAMERA_UNSUPPORTED', { details: 'zoom nicht verfügbar', userMessage: 'Diese Kamera bietet keinen Zoom.' });
+    const applied = clampToRange(value, range);
+    await this.applyAdvanced({ zoom: applied }, 'Der Zoom');
+    return applied;
+  }
+
+  /**
+   * Stellt den Fokusmodus ein.
+   * @param mode - `continuous`, `single-shot` oder `manual`.
+   * @throws {AppError} `ERR_CAMERA_UNSUPPORTED`, wenn der Modus nicht angeboten wird oder die Einstellung scheitert.
+   */
+  async setFocusMode(mode: FocusMode): Promise<void> {
+    if (!this.session?.focusModes.includes(mode)) {
+      throw new AppError('ERR_CAMERA_UNSUPPORTED', { details: `focusMode ${mode} nicht verfügbar`, userMessage: 'Dieser Fokusmodus wird von der Kamera nicht unterstützt.' });
+    }
+    await this.applyAdvanced({ focusMode: mode }, 'Der Fokus');
+  }
+
+  /**
+   * Stellt die manuelle Fokusentfernung ein (setzt den Modus auf manuell).
+   * @param value - Entfernungswert im Bereich der Kamera.
+   * @returns angewendeter Wert.
+   * @throws {AppError} `ERR_CAMERA_UNSUPPORTED`, wenn nicht unterstützt.
+   */
+  async setFocusDistance(value: number): Promise<number> {
+    const range = this.session?.focusDistance;
+    if (!range || !this.session?.focusModes.includes('manual')) {
+      throw new AppError('ERR_CAMERA_UNSUPPORTED', { details: 'focusDistance nicht verfügbar', userMessage: 'Die Kamera erlaubt keine manuelle Fokusentfernung.' });
+    }
+    const applied = clampToRange(value, range);
+    await this.applyAdvanced({ focusMode: 'manual', focusDistance: applied }, 'Der Fokus');
+    return applied;
+  }
+
+  /**
+   * Stellt die Belichtungskorrektur ein (heller/dunkler).
+   * @param value - Wert im Bereich der Kamera (EV).
+   * @returns angewendeter Wert.
+   * @throws {AppError} `ERR_CAMERA_UNSUPPORTED`, wenn nicht unterstützt.
+   */
+  async setExposure(value: number): Promise<number> {
+    const range = this.session?.exposure;
+    if (!range) throw new AppError('ERR_CAMERA_UNSUPPORTED', { details: 'exposureCompensation nicht verfügbar', userMessage: 'Die Kamera erlaubt keine Belichtungskorrektur.' });
+    const applied = clampToRange(value, range);
+    await this.applyAdvanced({ exposureCompensation: applied }, 'Die Belichtung');
+    return applied;
+  }
+
+  /** @returns `true`, wenn der Browser hochauflösende Fotos (`ImageCapture`) anbietet. */
+  get photoSupported(): boolean {
+    return typeof this.env.createImageCapture === 'function';
+  }
+
+  /**
+   * Nimmt ein hochauflösendes Foto mit der laufenden Kamera auf (deutlich schärfer und größer als ein Videobild).
+   * @returns Bilddatei.
+   * @throws {AppError} `ERR_CAMERA_UNSUPPORTED`, wenn keine Kamera läuft, der Browser `ImageCapture` nicht kennt oder die Aufnahme scheitert.
+   */
+  async takePhoto(): Promise<Blob> {
+    const session = this.session;
+    const create = this.env.createImageCapture;
+    if (!session || !create) {
+      throw new AppError('ERR_CAMERA_UNSUPPORTED', { details: 'ImageCapture nicht verfügbar', userMessage: 'Dieses Gerät bzw. dieser Browser kann kein hochauflösendes Foto aufnehmen. Nutzen Sie „Mit Kamera-App fotografieren“.' });
+    }
+    try {
+      return await create(session.track).takePhoto();
+    } catch (error: unknown) {
+      throw new AppError('ERR_CAMERA_UNSUPPORTED', { details: error instanceof Error ? `${error.name}: ${error.message}` : String(error), cause: error, userMessage: 'Das Foto konnte nicht aufgenommen werden.' });
     }
   }
 }

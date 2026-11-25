@@ -182,6 +182,12 @@ Balkenhöhe (Module, ohne Klartext): EAN-13/UPC-A 69, EAN-8 65, Code 128 50.
 
 ## 5a. Erfassung: Kamera, Decoder, Capture (`adapters/camera`, `adapters/decoder`, `adapters/feedback`, `application/capture-service.ts`)
 
+**Kamera-Steuerung (ab 0.4.0, `domain/camera-controls.ts`, `ui/components/camera-controls.ts`):**
+- `CameraSession` trägt die Fähigkeiten der Spur (`zoom`, `focusModes`, `focusDistance`, `exposure` als `CapabilityRange`, `width`/`height`); `parseRange` verwirft fehlende oder unsinnige Bereiche (z. B. min = max), sodass nicht unterstützte Regler **ausgeblendet** werden. Angewendet wird über `applyConstraints({ advanced: [...] })` (`setZoom`, `setFocusMode`, `setFocusDistance`, `setExposure`); Werte werden vorher auf Bereich und Schrittweite begrenzt (`clampToRange`), Fehler als `ERR_CAMERA_UNSUPPORTED` mit verständlicher Meldung gemeldet.
+- **Zoom:** Hardware-Zoom, wenn vorhanden; sonst **digitaler Zoom** (CSS-Skalierung des Videos, Auswertung des zentrierten Ausschnitts über ein Canvas, `digitalCrop`; ohne Canvas wird das ganze Bild ausgewertet). Voreinstellungen `zoomPresets`, Zwei-Finger-Geste `pinchZoom` über Pointer-Events (`touch-action: none` auf dem Kamerabild). Anfragen werden **serialisiert** (während einer Anfrage zählt nur der neueste Wunsch), damit schnelles Schieben die Kamera nicht überflutet. Der Zoom wird in den Bedieneinstellungen gemerkt und bei jedem Kamerastart wiederhergestellt.
+- **Auflösung:** `cameraResolution` (`standard` 1280×720, `high` 1920×1080 = Standardwert, `max` 3840×2160) als `ideal`-Wunsch; ein Wechsel startet die Kamera neu. Die tatsächliche Auflösung steht im Kamerastatus.
+- **Fotos für kleine Codes:** `takePhoto()` nutzt `ImageCapture.takePhoto()` (volle Sensorauflösung, injizierbar über `createImageCapture`); das Foto läuft durch denselben Pfad wie der Foto-Import (`scanImages`). Zusätzlich öffnet ein Dateifeld mit `capture="environment"` die Kamera-App des Telefons. Der zxing-wasm-Decoder arbeitet standardmäßig mit „tryHarder“, es sind keine zusätzlichen Decoder-Optionen nötig.
+
 **Kamera (`CameraAdapter`)** – Browser-Schnittstellen sind strukturell typisiert und injizierbar (Tests ohne Kamera).
 - Constraints: `facingMode: { ideal: 'environment' }` (Rückkamera, auf Geräten ohne Rückkamera trotzdem eine Kamera), 1280×720 als Wunsch, kein Audio; eine feste `deviceId` überschreibt die Blickrichtung.
 - Fehlerdiagnose: kein HTTPS/localhost → `ERR_CAMERA_INSECURE_CONTEXT`; `NotAllowedError`/`SecurityError` → `ERR_CAMERA_PERMISSION_DENIED`; `NotFoundError`/`OverconstrainedError` → `ERR_CAMERA_NOT_FOUND`; `NotReadableError`/`AbortError` → `ERR_CAMERA_NOT_FOUND` mit Hinweis auf eine andere App.
@@ -274,6 +280,8 @@ Werte werden geklammert (Anzeige 100–5000 ms, Leerzeit 50–3000 ms, identisch
 
 ### Wiedergabe-Controller (`application/playback-service.ts`)
 `prepare` (Sammlung laden, Liste bauen, optional interleaven, **Profil prüfen**, **jedes einzigartige Symbol vorab rendern** – nicht darstellbare oder nicht passende Codes verhindern den Start mit Positionsangabe) → `begin` (Sitzungskopf zuerst speichern; scheitert das, startet nichts; Maschine anlegen, Ereignisse und Status fortlaufend sequenziell in IndexedDB schreiben, Wake Lock) → `pauseActive/failActive/abortActive`. Protokoll-Schreibfehler werden gemeldet, blockieren aber nie das Ausblenden.
+
+**Auswahl und Zeiten (ab 0.4.0):** `PlaybackRequest.itemIds` beschränkt den Lauf auf gewählte Positionen (Reihenfolge der Sammlung bleibt; die Auswahl wirkt **vor** der Ablauf-Prüfung; leere oder unbekannte Auswahl → `ERR_PLAYBACK_FAILED` „kein Code ausgewählt“; die Kalibrierung ignoriert sie). Die Zeiten eines Laufs kommen aus dem Profil, sind aber im Setup pro Lauf änderbar; das übergebene Profil wird wie immer mit `validateProfile` geprüft. `SessionRecord.timing` speichert die **tatsächlich verwendeten** Zeiten (optional, additiv; im Backup geprüft, ältere Sitzungen ohne Feld bleiben gültig), denn `profileId` allein würde bei geänderten Zeiten ein falsches Bild zeigen.
 
 ## 8. ADR-Protokoll
 Spezifikations-ADRs 01–05 gelten unverändert (Kap. 26). Ergänzungen:
@@ -421,3 +429,12 @@ Entscheidung: `library/**` ist vom Precache ausgeschlossen (`globIgnores`); ein 
 
 ### ADR-53: Aktualisierung über Fingerabdruck, nie automatisch überschreibend
 Entscheidung: Jede übernommene Sammlung speichert `library = { file, hash, importedAt }` (Fingerabdruck des übernommenen Inhalts, `contentHash`). Der Status ergibt sich aus Vergleich von veröffentlichtem Hash, gespeichertem Hash und aktuellem lokalen Inhalt (`new`, `current`, `update`, `update-modified`, `modified`). Prüfen schreibt nie; Aktualisieren ersetzt den Inhalt atomar (ID und lokaler Name bleiben), und bei `update-modified` erst nach ausdrücklicher Bestätigung. Der Name zählt nicht als Änderung, Menge, Reihenfolge und alle Zusatzangaben schon. „Von Bibliothek lösen“ entfernt die Verknüpfung. Grund: Lokale Arbeit darf nie unbemerkt verloren gehen; ein nicht kryptografischer 53-Bit-Fingerabdruck genügt zur Änderungserkennung (kein Sicherheitsmerkmal). Dateinamen im Index sind streng auf `[Buchstaben Ziffern _ - .]` + `.json` begrenzt (kein Pfadzugriff), eine fehlerhafte Datei blockiert die übrigen nicht.
+
+### ADR-54: Zoom und Kameraregler nur bei Unterstützung, digitaler Zoom ehrlich als Rückfall
+Entscheidung: Regler erscheinen nur, wenn `getCapabilities()` sie meldet; ohne Hardware-Zoom wird digital gezoomt und das in der Oberfläche gesagt. Grund: Android-Geräte unterscheiden sich stark; ein wirkungsloser Regler wäre irreführend. Digitaler Zoom erzeugt keine zusätzlichen Details und wird deshalb nicht als Verbesserung der Lesbarkeit verkauft – dafür gibt es Auflösung, hochauflösendes Foto und die Kamera-App.
+
+### ADR-55: Standardauflösung „Hoch“ (1920×1080), hochauflösendes Foto als Weg für sehr kleine Codes
+Entscheidung: Standard 1920×1080 statt 1280×720; zusätzlich `ImageCapture.takePhoto()` und ein `capture`-Dateifeld für die Kamera-App. Grund: Kleine Codes scheitern meist an zu wenigen Pixeln je Modul; ein Videobild wird bei Annäherung unscharf und verrauscht, ein Foto in Sensorauflösung (oft 12 MP) ist deutlich schärfer. Mehr Pixel kosten Rechenzeit, deshalb bleibt die Stufe wählbar.
+
+### ADR-56: Zeiten pro Lauf anpassbar und im Protokoll festgehalten, Codeauswahl im Setup
+Entscheidung: Die Zeiten des Profils sind im Fader-Setup direkt editierbar (Lauf-lokal, optional als neues Profil speicherbar); die Auswahl der Codes geschieht per Häkchen, Tag-Filter und Suche. Grund: Kassenzeiten müssen schnell probiert werden können, ohne Profile zu überschreiben; welche Codes laufen, soll ohne Umbau der Sammlung wählbar sein. Gespeichert werden die tatsächlichen Zeiten (`SessionRecord.timing`).

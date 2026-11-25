@@ -50,6 +50,16 @@ Sobald alle Dateien im Gerätespeicher liegen, zeigt die App „**Die App ist je
 - **Freigegebene Formate:** EAN-13, EAN-8, QR-Code (Text), Code 128; UPC-A können Sie zuschalten. Erkennungen mit falscher Prüfziffer werden **verworfen**, nie korrigiert. Ein UPC-A-Strichcode wird standardmäßig als **EAN-13 mit führender 0** gespeichert (beide haben dieselben Striche).
 - Die Kamera stoppt automatisch, wenn Sie die App verlassen oder in den Hintergrund wechseln.
 
+**Kleine Codes lesen (Zoom und Kamera-Einstellungen):** Gehen Sie bei kleinen Codes **nicht näher heran** – die meisten Handykameras werden dann unscharf und verrauscht. Stattdessen:
+- **Zoom:** Unter dem Kamerabild im Aufklapper *Zoom und Kamera-Einstellungen* gibt es einen **Schieber**, **−/+**, Voreinstellungen (**1×, 2×, 3×, 5×, 8×**, Maximum) und die **Zwei-Finger-Geste** direkt auf dem Kamerabild. Der gewählte Zoom wird gemerkt. Bietet Ihre Kamera keinen Hardware-Zoom, zoomt die App **digital** (Ausschnitt, bis 4×) und sagt das dazu; das hilft beim Zielen, liefert aber keine zusätzlichen Details.
+- **Auflösung:** *Standard* (1280×720, schnell), *Hoch* (1920×1080, voreingestellt) oder *Maximal* (3840×2160). Höher heißt: kleine Codes werden besser erkannt, aber Akku und Rechenzeit steigen. Ein Wechsel startet die Kamera neu.
+- **Fokus:** Wenn Ihr Gerät es anbietet, wählen Sie *Automatisch*, *Einmal scharfstellen* oder *Manuell* (Entfernungsregler) und können mit **Jetzt scharfstellen** den Autofokus neu anstoßen.
+- **Helligkeit:** Eine Belichtungskorrektur (heller/dunkler), falls Ihr Gerät sie anbietet. Zusätzlich hilft die **Taschenlampe** bei dunklem Lager.
+- **Hochauflösendes Foto auswerten:** nimmt ein Foto in **voller Kameraauflösung** auf (viel schärfer und größer als ein Videobild) und wertet es aus; die Treffer erscheinen unter *Foto-Import* zur Auswahl. Das ist oft der beste Weg für sehr kleine Codes.
+- **Mit Kamera-App fotografieren:** öffnet die normale Kamera-App Ihres Telefons (mit deren Zoom, Fokus und Bildverarbeitung); das Foto wird danach ausgewertet.
+
+Regler, die Ihr Gerät nicht unterstützt (z. B. Fokus oder Belichtung), werden **ausgeblendet** statt wirkungslos angezeigt. Welche Regler erscheinen, hängt von Handy und Browser ab.
+
 **Foto-Import:** Wählen Sie ein oder mehrere Fotos. Pro Foto sehen Sie die erkannten Codes und wählen aus, welche übernommen werden. Bilder ohne Code oder nicht lesbare Bilder werden als solche gemeldet. Die Fotos selbst werden **nicht** gespeichert; der Dateiname dient als Bezeichnung.
 
 **Zusatzangaben beim Erfassen:** Unter dem Kamerabild erscheinen die zuletzt erfassten Codes; **Details** daneben öffnet das Formular für Wort, Nutzen, Satz, Tags und Ablaufdatum (Kapitel 4). Bei der manuellen Eingabe können Sie diese Angaben im Aufklapper **Zusatzangaben** einmal ausfüllen; sie gelten für alle Codes dieser Eingabe.
@@ -100,7 +110,17 @@ Leere Felder bleiben leer; **Leeren** entfernt eine Angabe wieder. Zu lange Text
 - **Vorsicht im Kassenbetrieb:** In Ihrem Kassensystem können einzelne Stellen eine besondere Bedeutung haben (z. B. Preis oder Gewicht). Testen Sie neue Nummernbereiche nur in einem freigegebenen Testprozess.
 
 ## 6. Der Kassen-Fader (Bereich **Fader**)
-**Vorbereiten:** Sammlung, **Scannerprofil**, **Modus** und optional **Smart-Interleaving** wählen, **Start**. Vor dem Start prüft die App, dass **jeder** Code darstellbar ist; sonst startet sie nicht und nennt die Position.
+**Vorbereiten:** Sammlung, **welche Codes**, **Scannerprofil** samt **Zeiten**, **Modus** und optional **Smart-Interleaving** wählen, **Start**. Vor dem Start prüft die App, dass **jeder** Code darstellbar ist; sonst startet sie nicht und nennt die Position.
+
+**Welche Codes abspielen?** Im Aufklapper *Welche Codes abspielen?* steht jede Position der Sammlung mit Häkchen (Standard: alle). Sie können einzeln abwählen, nach **Tag** filtern (z. B. nur „Firma XYZ“), **suchen** und mit **„Nur die gefilterten“** genau diese auswählen. **Alle** und **Keine** setzen alles. Die Reihenfolge der Sammlung bleibt erhalten; darunter steht, wie viele Positionen und Stück ausgewählt sind. Ist nichts ausgewählt, startet der Fader nicht. Abgelaufene Codes sind markiert und werden – wie in Kapitel 4 beschrieben – standardmäßig übersprungen. Wollen Sie nur einen Teil dauerhaft abspielen, legen Sie eine eigene Sammlung dafür an.
+
+**Wo stelle ich die Zeiten ein?** Im Aufklapper *Zeiten für diesen Lauf* direkt im Fader (in Millisekunden, 1000 ms = 1 s):
+- **Anzeigezeit** – so lange ist ein Code sichtbar.
+- **Zeit zwischen zwei Codes** – das leere (weiße) Bild dazwischen, mindestens 20 ms.
+- **Zeit vor einem identischen Folgecode** – längere Leerzeit, wenn zweimal derselbe Code kommt.
+- **Startverzögerung** – Zeit, das Telefon an den Scanner zu halten.
+
+Die Felder sind aus dem gewählten **Scannerprofil** vorbelegt. Änderungen gelten für diesen Lauf und werden im Sitzungsprotokoll festgehalten; mit **„Als neues Profil speichern“** behalten Sie sie dauerhaft. Profile verwalten (bearbeiten, löschen) Sie unter *Einstellungen → Scannerprofile*; passende Werte für Ihre Kasse finden Sie mit der **20er-Kalibrierung** (Kapitel 8). Bei ungültigen Werten (z. B. Leerzeit unter 20 ms) startet der Fader nicht und sagt warum.
 
 **Modi**
 - **Manuell:** Jede Position wird kurz angezeigt, dann wartet die App. Sie prüfen die Kasse und tippen **„Geprüft – weiter“** (oder Enter).

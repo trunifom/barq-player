@@ -12,7 +12,9 @@ import type { Dispose, Route } from '../../app/routes';
 import type { FileScanResult } from '../../adapters/decoder/decoder-adapter';
 import type { CaptureOutcome } from '../../application/capture-service';
 import type { DuplicateRule } from '../../application/collection-service';
+import { RESOLUTION_INFO } from '../../domain/camera-controls';
 import { formatDateDe } from '../../domain/expiry';
+import { createCameraControls } from '../components/camera-controls';
 import { promptDialog } from '../components/dialog';
 import { h, setChildren } from '../components/dom';
 import { editItemDetails } from '../components/item-editor';
@@ -52,6 +54,14 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
   const switchBtn = h('button', { type: 'button', class: 'btn', id: 'sc-switch', disabled: true }, 'Kamera wechseln');
   const camStatus = h('p', { class: 'hint', id: 'sc-cam-status', role: 'status' }, 'Kamera aus.');
   let torchOn = false;
+  const cameraBox = h('div', { class: 'camera' }, video, h('div', { class: 'camera__reticle', 'aria-hidden': 'true' }));
+  const photoBtn = h('button', { type: 'button', class: 'btn', id: 'sc-photo', disabled: true, title: 'Nimmt ein Foto in voller Kameraauflösung auf und wertet es aus – ideal für kleine Codes' }, 'Hochauflösendes Foto auswerten');
+  const controls = createCameraControls(ctx, video, cameraBox, {
+    restartCamera: () => {
+      stopCamera();
+      void startCamera();
+    }
+  });
 
   const currentCollection = (): string => collectionSelect.value;
 
@@ -126,7 +136,7 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
     try {
       const cid = currentCollection();
       if (cid && video.readyState >= 2) {
-        const report = await ctx.getCapture().processFrame(cid, video);
+        const report = await ctx.getCapture().processFrame(cid, controls.frameSource());
         if (alive) handleOutcomes(report.outcomes);
       }
     } catch (error: unknown) {
@@ -143,7 +153,9 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
     torchBtn.disabled = !session.torchSupported;
     switchBtn.disabled = false;
     camToggle.textContent = 'Kamera stoppen';
-    camStatus.textContent = `Kamera läuft (${session.facingMode ?? 'unbekannte Richtung'}).`;
+    camStatus.textContent = `Kamera läuft (${session.facingMode ?? 'unbekannte Richtung'}${session.width && session.height ? `, ${session.width}×${session.height}` : ''}).`;
+    photoBtn.disabled = !ctx.camera.photoSupported;
+    controls.onSession(session);
     ctx.getCapture().resetSession();
     loop ??= setTimeout(() => void tick(), SCAN_INTERVAL_MS);
   };
@@ -160,6 +172,8 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
     torchOn = false;
     torchBtn.disabled = true;
     switchBtn.disabled = true;
+    photoBtn.disabled = true;
+    controls.onSession(null);
     camToggle.textContent = 'Kamera starten';
     camStatus.textContent = 'Kamera aus.';
   };
@@ -168,7 +182,8 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
     camToggle.disabled = true;
     try {
       await ctx.feedback.unlock(); // aus der Nutzeraktion heraus (Browser-Autoplay-Regel)
-      await ctx.camera.start();
+      const res = RESOLUTION_INFO[ctx.settings.get().cameraResolution];
+      await ctx.camera.start({ idealWidth: res.width, idealHeight: res.height });
       attach();
     } catch (error: unknown) {
       ctx.notify.error(error, { source: 'scanner-start' });
@@ -270,11 +285,11 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
     });
     setChildren(importOut, ...blocks, checks.length > 0 ? saveBtn : null);
   };
-  fileInput.addEventListener('change', () => {
-    const files = Array.from(fileInput.files ?? []);
-    if (files.length === 0) return;
+  /** Wertet Bilddateien aus (Foto-Import, Kamera-App, hochauflösendes Foto) und zeigt die Treffer zur Auswahl. */
+  const scanFiles = (files: File[], done?: () => void): Promise<void> => {
+    if (files.length === 0) return Promise.resolve();
     setChildren(importOut, h('p', { role: 'status' }, `${files.length} Bild(er) werden ausgewertet …`));
-    ctx
+    return ctx
       .getCapture()
       .scanImages(files)
       .then(renderScan)
@@ -282,8 +297,29 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
         ctx.notify.error(error, { source: 'scanner-import' });
         setChildren(importOut);
       })
+      .finally(() => done?.());
+  };
+  fileInput.addEventListener('change', () => {
+    void scanFiles(Array.from(fileInput.files ?? []), () => {
+      fileInput.value = '';
+    });
+  });
+
+  // Kamera-App des Telefons: oft bessere Bildverarbeitung, Zoom und Fokus als das Browser-Videobild
+  const nativeInput = h('input', { type: 'file', id: 'sc-native', accept: 'image/*', capture: 'environment', class: 'sr-only', 'aria-label': 'Mit Kamera-App fotografieren' });
+  nativeInput.addEventListener('change', () => {
+    void scanFiles(Array.from(nativeInput.files ?? []), () => {
+      nativeInput.value = '';
+    });
+  });
+  photoBtn.addEventListener('click', () => {
+    photoBtn.disabled = true;
+    void ctx.camera
+      .takePhoto()
+      .then((blob) => scanFiles([new File([blob], 'kamera-foto.jpg', { type: blob.type || 'image/jpeg' })]))
+      .catch((error: unknown) => ctx.notify.error(error, { source: 'scanner-photo' }))
       .finally(() => {
-        fileInput.value = '';
+        photoBtn.disabled = ctx.camera.current === null || !ctx.camera.photoSupported;
       });
   });
 
@@ -370,7 +406,7 @@ export function mountScanner(root: HTMLElement, ctx: AppContext, _route: Route):
       { class: 'screen', 'aria-labelledby': 'sc-title' },
       h('h1', { id: 'sc-title' }, 'Erfassen'),
       h('div', { class: 'field' }, h('label', { for: 'sc-collection' }, 'Sammlung'), h('div', { class: 'inline' }, collectionSelect, h('button', { type: 'button', class: 'btn', id: 'sc-new', onclick: () => void newCollection() }, 'Neu'))),
-      h('details', { open: true, class: 'card' }, h('summary', null, 'Kamera'), h('div', { class: 'camera' }, video, h('div', { class: 'camera__reticle', 'aria-hidden': 'true' })), h('div', { class: 'btn-row' }, camToggle, torchBtn, switchBtn), camStatus, h('fieldset', { class: 'fieldset' }, h('legend', null, 'Freigegebene Formate'), ...FORMAT_ORDER.map((f, i) => h('label', { class: 'check', for: `sc-fmt-${f}` }, formatBoxes[i] as HTMLElement, SYMBOLOGY_LABEL[f])), h('label', { class: 'check', for: 'sc-unique' }, uniqueBox, 'Nur eindeutige Codes erfassen'))),
+      h('details', { open: true, class: 'card' }, h('summary', null, 'Kamera'), cameraBox, h('div', { class: 'btn-row' }, camToggle, torchBtn, switchBtn), camStatus, h('details', { class: 'sub-details', id: 'sc-cam-settings', open: true }, h('summary', null, 'Zoom und Kamera-Einstellungen'), controls.element), h('div', { class: 'btn-row' }, photoBtn, h('label', { class: 'btn', for: 'sc-native', id: 'sc-native-label' }, 'Mit Kamera-App fotografieren'), nativeInput), h('p', { class: 'hint' }, 'Tipp bei kleinen Codes: nicht näher herangehen (das Bild wird unscharf), sondern zoomen, die Auflösung erhöhen oder ein hochauflösendes Foto auswerten. Die Auswertung des Fotos erscheint unter „Foto-Import“.'), h('fieldset', { class: 'fieldset' }, h('legend', null, 'Freigegebene Formate'), ...FORMAT_ORDER.map((f, i) => h('label', { class: 'check', for: `sc-fmt-${f}` }, formatBoxes[i] as HTMLElement, SYMBOLOGY_LABEL[f])), h('label', { class: 'check', for: 'sc-unique' }, uniqueBox, 'Nur eindeutige Codes erfassen'))),
       h('details', { class: 'card' }, h('summary', null, 'Foto-Import'), h('p', { class: 'hint' }, 'Ein oder mehrere Fotos wählen. Erkannte Codes können einzeln übernommen werden. Die Fotos selbst werden nicht gespeichert.'), h('label', { for: 'sc-files', class: 'sr-only' }, 'Fotos auswählen'), fileInput, importOut),
       h('details', { class: 'card' }, h('summary', null, 'Manuelle Eingabe und Liste'), h('div', { class: 'field' }, h('label', { for: 'sc-man-sym' }, 'Format'), symSelect), h('div', { class: 'field' }, h('label', { for: 'sc-man-dup' }, 'Gleiche Codes'), dupSelect), h('div', { class: 'field' }, h('label', { for: 'sc-man-text' }, 'Codes (eine Zeile = ein Code)'), text), h('details', { class: 'sub-details', open: true }, h('summary', null, 'Zusatzangaben (optional, gelten für alle Codes dieser Eingabe)'), manMeta.element), h('button', { type: 'button', class: 'btn', id: 'sc-man-check', onclick: check }, 'Prüfen'), manOut),
       h('section', { class: 'card', 'aria-labelledby': 'sc-recent-title' }, h('h2', { id: 'sc-recent-title' }, 'Zuletzt erfasst'), recent)

@@ -47,10 +47,30 @@ export class FakeCamera {
   current: CameraSession | null = null;
   torchSupported = true;
   startError: unknown = null;
-  start = vi.fn(async () => {
+  /** Fähigkeiten der Test-Kamera (Standard: voller Zoom/Fokus/Belichtung wie ein modernes Android-Gerät). */
+  zoomRange: { min: number; max: number; step: number } | null = { min: 1, max: 8, step: 0.1 };
+  focusModes: Array<'continuous' | 'single-shot' | 'manual'> = ['continuous', 'single-shot', 'manual'];
+  focusDistanceRange: { min: number; max: number; step: number } | null = { min: 0.1, max: 2, step: 0.05 };
+  exposureRange: { min: number; max: number; step: number } | null = { min: -2, max: 2, step: 0.5 };
+  photoSupported = true;
+  lastOptions: unknown = null;
+  start = vi.fn(async (options?: unknown) => {
+    this.lastOptions = options ?? null;
     if (this.startError) throw this.startError;
     const track = { stop: vi.fn() };
-    this.current = { stream: { getTracks: () => [track], getVideoTracks: () => [track] }, track, facingMode: 'environment', deviceId: 'cam', torchSupported: this.torchSupported };
+    this.current = {
+      stream: { getTracks: () => [track], getVideoTracks: () => [track] },
+      track,
+      facingMode: 'environment',
+      deviceId: 'cam',
+      torchSupported: this.torchSupported,
+      zoom: this.zoomRange,
+      focusModes: [...this.focusModes],
+      focusDistance: this.focusDistanceRange,
+      exposure: this.exposureRange,
+      width: 1280,
+      height: 720
+    };
     return this.current;
   });
   stop = vi.fn(() => {
@@ -58,6 +78,11 @@ export class FakeCamera {
   });
   switchCamera = vi.fn(async () => this.start());
   setTorch = vi.fn(() => Promise.resolve());
+  setZoom = vi.fn((v: number) => Promise.resolve(v));
+  setFocusMode = vi.fn(() => Promise.resolve());
+  setFocusDistance = vi.fn((v: number) => Promise.resolve(v));
+  setExposure = vi.fn((v: number) => Promise.resolve(v));
+  takePhoto = vi.fn(() => Promise.resolve(new Blob(['foto'], { type: 'image/jpeg' })));
 }
 
 export function memoryStorage(): KeyValueStorage {

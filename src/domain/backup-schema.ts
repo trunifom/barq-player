@@ -331,6 +331,12 @@ export function validateBackup(input: unknown): BackupValidation {
   const sessions: SessionRecord[] = r.list(dataRaw, 'sessions', 'data').map((o, i) => {
     const p = `data.sessions[${i}]`;
     const profileId = r.optStr(o, 'profileId', p);
+    let timing: SessionRecord['timing'];
+    if (o['timing'] !== undefined) {
+      const t = o['timing'];
+      if (!isRec(t)) r.add(`${p}.timing`, 'muss ein Objekt sein');
+      else timing = { displayMs: r.num(t, 'displayMs', `${p}.timing`, 0, false), blankMs: r.num(t, 'blankMs', `${p}.timing`, 0, false), identicalBlankMs: r.num(t, 'identicalBlankMs', `${p}.timing`, 0, false), startDelayMs: r.num(t, 'startDelayMs', `${p}.timing`, 0, false) };
+    }
     if (typeof o['interleaved'] !== 'boolean') r.add(`${p}.interleaved`, 'muss true oder false sein');
     return {
       id: r.str(o, 'id', p, { nonEmpty: true }),
@@ -341,7 +347,8 @@ export function validateBackup(input: unknown): BackupValidation {
       entryCount: r.int(o, 'entryCount', p, 0),
       interleaved: o['interleaved'] === true,
       status: r.oneOf(o, 'status', p, SESSION_STATUS),
-      ...(profileId === undefined ? {} : { profileId })
+      ...(profileId === undefined ? {} : { profileId }),
+      ...(timing === undefined ? {} : { timing })
     };
   });
 

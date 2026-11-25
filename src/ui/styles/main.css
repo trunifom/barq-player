@@ -743,3 +743,45 @@ code {
   max-height: 10rem;
   overflow: auto;
 }
+
+/* ------------------------------------------------------------------ Kamera-Bedienfeld, Auswahl im Fader */
+.camera {
+  touch-action: none; /* Zwei-Finger-Zoom wird von der App ausgewertet, nicht vom Browser */
+}
+
+.camera__video {
+  transform-origin: center center;
+}
+
+.camera-controls input[type='range'] {
+  width: 100%;
+  min-height: 2.75rem;
+}
+
+.camera-controls .btn[aria-pressed='true'] {
+  background: #111827;
+  color: #fff;
+}
+
+.pick-list {
+  max-height: 16rem;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.pick-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.5rem 0.6rem;
+  min-height: 2.75rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.pick-row input[type='checkbox'] {
+  width: 1.4rem;
+  height: 1.4rem;
+}

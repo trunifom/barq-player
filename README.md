@@ -20,6 +20,7 @@ Alle Meilensteine sind umgesetzt (Details und Nachweise je Anforderung in [`docs
 | M7 | Offline-Härtung (Service Worker, Update-Policy, Icons), Lift-to-Pause, Endabnahme | ✅ |
 | M8 | Alltagstauglichkeit (Version 0.2.0): Zusatzangaben je Code (Wort, Nutzen, Satz, Tags, Ablaufdatum), Ablauf-Markierung, Suche/Filter, Teilen (Datei, Link, Text), vollständiger Import (geteilte Sammlung, Backup, CSV, Liste, Link), Installationsknopf, Backup-Erinnerung, Veröffentlichung per GitHub Pages | ✅ |
 | M9 | Gemeinsame Bibliothek (Version 0.3.0): Sammlungen samt Wort, Nutzen, Satz, Tags und Ablaufdatum werden als Dateien im Repository veröffentlicht; wer die Web-Adresse öffnet, kann sie übernehmen und aktualisieren – ohne Neuerfassung | ✅ |
+| M10 | Kamera und Fader (Version 0.4.0): Zoom (Hardware und digital, Pinch), Auflösung, Fokus, Belichtung, hochauflösendes Foto und Kamera-App für kleine Codes; Fader mit Codeauswahl (Häkchen, Tag-Filter, Suche) und Zeiten pro Lauf | ✅ |
 
 **Noch nicht Teil von Version 1** (Spezifikation 9.3): Frontkamera-/Mikrofon-Rückkanal, Kassenschnittstelle, Synchronisierung. Die Stellenbedeutung des Nummernbereichs `2063701…` und die tatsächlichen Scanner-/Kassenzeiten müssen an der realen Hardware geklärt werden (Kalibrierung).
 

@@ -173,6 +173,8 @@ export interface SessionRecord {
   /** App-Version zum Sitzungszeitpunkt (Spezifikation 19.4). */
   appVersion: string;
   profileId?: string;
+  /** Tatsächlich verwendete Zeiten des Laufs (können vom Profil abweichen, wenn sie vor dem Start angepasst wurden). */
+  timing?: { displayMs: number; blankMs: number; identicalBlankMs: number; startDelayMs: number };
   entryCount: number;
   /** Wurde Smart-Interleaving angewendet? */
   interleaved: boolean;
