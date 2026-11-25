@@ -50,6 +50,9 @@ Status-Werte: **Offen** / **In Arbeit** / **Umgesetzt**. Commit-Nummern laufen f
 | F-19 | Vollständiger Import: geteilte Sammlung, Backup, CSV, Liste, Link (zweistufig, additiv) | Umgesetzt | 2026-11-25 | 08:36:18 | #009 `ee17d5f` | `application/import-service.ts`, `ui/components/import-dialog.ts`, `domain/csv-items.ts` | `meta-share-import.test.ts`, `csv-items.test.ts`, `meta-share.test.ts` |
 | F-20 | Suchen und Filtern (Text, Tag, nur abgelaufene), Ablaufdatum für viele Codes setzen | Umgesetzt | 2026-11-25 | 08:36:18 | #009 `ee17d5f` | `ui/screens/collections.ts`, `domain/item-meta.ts`, `application/collection-service.ts` | `item-meta.test.ts`, `meta-share-import.test.ts`, `meta-share.test.ts` |
 | Q-08 | Alltagsbetrieb: GitHub-Pages-Deployment mit Tests als Gate, Installationsknopf, Backup-Erinnerung | Umgesetzt | 2026-11-25 | 08:36:18 | #009 `ee17d5f` | `.github/workflows/pages.yml`, `offline/install-prompt.ts`, `application/settings-store.ts`, `ui/screens/settings.ts` | `install-prompt.test.ts`, `meta-share.test.ts` |
+| F-21 | Gemeinsame Bibliothek: Sammlungen mit Wort, Nutzen, Satz, Tags und Ablaufdatum mit der App veröffentlichen, auf jedem Gerät übernehmen und aktualisieren (ohne Neuerfassung) | Umgesetzt | 2026-11-25 | 08:55:38 | #010 `aa738b3` | `domain/library.ts`, `application/library-service.ts`, `application/collection-service.ts`, `ui/screens/collections.ts`, `app/bootstrap.ts` | `library.test.ts`, `library-service.test.ts`, `ui/library.test.ts` |
+| F-22 | Lokale Änderungen an Bibliotheks-Sammlungen erkennen, nie automatisch überschreiben; „Von Bibliothek lösen“ | Umgesetzt | 2026-11-25 | 08:55:38 | #010 `aa738b3` | `domain/library.ts`, `application/collection-service.ts`, `ui/screens/collections.ts` | `library.test.ts`, `library-service.test.ts`, `ui/library.test.ts` |
+| Q-09 | Bibliotheks-Gate vor Veröffentlichung (jede Datei streng geprüft), Index-Skript, netzwerkbevorzugter Laufzeitcache statt Precache | Umgesetzt | 2026-11-25 | 08:55:38 | #010 `aa738b3` | `scripts/library-index.mjs`, `vite.config.ts`, `public/library/` | `tests/build/library.test.ts`, `production-build.test.ts` |
 
 ## 2. Meilensteinplan
 
@@ -105,6 +108,13 @@ Entscheidungen: ADR-44 … ADR-50 (Zusatzangaben additiv ohne Schema-Sprung, Abl
 Gefunden und behoben durch Tests: unbehandelte Ablehnung beim Entpacken beschädigter Links (Link-Codec).
 Tests: 978/978 grün (55 Dateien, +129), `npm run build` ohne Warnungen.
 
+### #010 – `aa738b3` – 2026-11-25 08:55:38
+`feat(bibliothek)`: Gemeinsame Bibliothek, Version 0.3.0 (F-21, F-22, Q-09 umgesetzt). Anforderungsänderung des Auftraggebers: Codes nicht jedes Mal neu erfassen; Sammlungen über die Web-Adresse der App mit anderen teilen, inklusive Wort, Nutzen, Tags, Notiz und Ablaufdatum.
+Dateien: `src/domain/library.ts`, `src/application/library-service.ts`, `src/application/collection-service.ts`, `src/domain/{types,backup-schema,errors}.ts`, `src/ui/screens/{collections,scanner}.ts`, `src/app/{bootstrap,container,version}.ts`, `scripts/library-index.mjs`, `public/library/index.json`, `vite.config.ts`, `package.json`, `tests/{unit,integration,ui,build}/*`, Doku.
+Entscheidungen: ADR-51 … ADR-53 (Dateien im Repository statt Schreibzugriff auf GitHub aus der App wegen AGENTS.md Regel 1 und Token-Sicherheit; netzwerkbevorzugter Cache statt Precache; Fingerabdruck-Aktualisierung ohne automatisches Überschreiben).
+Hinweis an den Auftraggeber: Das Beispiel `2345678765432` hat eine falsche GS1-Prüfziffer (richtig: `2345678765430`); die App lehnt es ab und korrigiert nie selbst (Regel 4).
+Tests: 1028/1028 grün (59 Dateien, +50), `npm run build` ohne Warnungen.
+
 ## 4. Endabnahme (Meilenstein 7)
 
 - Alle Muss-Anforderungen F-01 … F-15 sowie S-01 … S-07 und Q-01 … Q-07 sind „Umgesetzt“ (siehe Tabelle).
@@ -113,6 +123,6 @@ Tests: 978/978 grün (55 Dateien, +129), `npm run build` ohne Warnungen.
 
 ## 5. Stand nach Alltags-Erweiterung (Version 0.2.0)
 
-- Zusätzlich umgesetzt: F-16 … F-20 und Q-08 (siehe Tabelle). Quality Gate: `npm test` 978/978, `npm run build` 0 Fehler / 0 Warnungen.
+- Zusätzlich umgesetzt: F-16 … F-20 und Q-08 (Version 0.2.0) sowie F-21, F-22 und Q-09 (Version 0.3.0, gemeinsame Bibliothek). Quality Gate: `npm test` 1028/1028, `npm run build` 0 Fehler / 0 Warnungen.
 - Noch am echten Gerät zu prüfen (nicht automatisiert testbar): Web-Share-Dialog mit Dateien auf dem Zielgerät (Chrome Android erlaubt je nach Version nur `.txt`; die App weicht automatisch aus), Installation über GitHub Pages, Datumswähler des Telefons.
 - Einmalig nötig (außerhalb des Codes): GitHub-Repository → Settings → Pages → Source „GitHub Actions“; danach veröffentlicht jeder Push auf `main` die App nach bestandenen Tests.
